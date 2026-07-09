@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Charge Desk</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Local usage dashboard</p>
+          <h1>AI Charge Desk</h1>
+        </div>
+        <div class="top-meta">
+          <div class="freshness" id="freshness">Loading</div>
+          <div id="fx"></div>
+        </div>
+      </header>
+
+      <section class="summary-grid" id="services"></section>
+
+      <section class="definition-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Data definitions</p>
+          <h2>숫자 기준</h2>
+        </div>
+        <div class="definition-grid">
+          <article>
+            <h3>달러 · 한화 표기</h3>
+            <p>비용은 <strong>달러($)가 기본</strong>, <strong>원화(₩)는 괄호</strong>로 표기한다. $ = estimated token cost(토큰 단가 환산 추정치)로 구독 청구액이 아니며, ₩은 그 $ 값을 USD→KRW 환율로 환산한 참고값이다(환율 실패 시 마지막 값 + "옛 환율" 표기).</p>
+          </article>
+          <article>
+            <h3>사용률 (quota %)</h3>
+            <p><strong>Used percent</strong> (몇 % 썼나)는 비용(cost)과 다른 값이다. Claude·Codex 사용률(현재세션·주간·Fable)은 <strong>실시간 사용량 API</strong>(read-only)에서 확보한다. 조회 못 하면 임의로 만들지 않고 마지막 성공값(오래됨) 또는 미표시로 둔다.</p>
+          </article>
+          <article>
+            <h3>리셋 시각</h3>
+            <p>리셋은 "N시간 후"만이 아니라 <strong>KST 실제 시각</strong>(예: 오후 4:59)과 상대시간을 같이 보여준다.</p>
+          </article>
+          <article>
+            <h3>집계 기간</h3>
+            <p>비용 집계는 <strong>오늘</strong> / <strong>주간(월요일~일요일)</strong> / <strong>이번 달(매월 1일~)</strong>로 나뉜다. 각 값 옆에 시작~종료 시각(KST)을 표기한다. 사용률 %의 리셋 창은 구독 리셋 주기라 이 비용 집계 창과 다를 수 있다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="audit-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Data audit</p>
+          <h2>지금 확인된 데이터</h2>
+        </div>
+        <div class="audit-grid" id="audit"></div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
