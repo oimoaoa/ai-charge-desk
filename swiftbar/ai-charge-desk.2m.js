@@ -174,14 +174,20 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
 }
 
 function printStaleBlock(dataMeta, staleReason, opts) {
-  const reasonText = STALE_REASON_TEXT[staleReason];
+  // 마지막 수집은 성공했고 나이만 10분을 넘긴 경우(수집 지연·잠자기 복귀 직후) —
+  // 곧 자동 수집이 따라잡는 무해한 상태라 원인 대신 "기다리거나 새로고침" 안내만(제품 결정 2026-07-10).
   // 색은 코랄레드(DANGER, 막대 위험색과 동일) — 주황(WARN)은 라이트 메뉴에서 흐려서 안 보임(제품 결정 2026-07-10).
+  if (dataMeta.fresh) {
+    console.log(`  ⚠️ 옛 데이터(${agoLabel(dataMeta.measuredAt)}) — 곧 자동 갱신돼요 · 급하면 위 "새로고침" | color=${DANGER}`);
+    return;
+  }
+  const reasonText = STALE_REASON_TEXT[staleReason];
   console.log(`  ⚠️ 옛 데이터(${agoLabel(dataMeta.measuredAt)})${reasonText ? ` — ${reasonText}` : ''} | color=${DANGER}`);
   if (staleReason === 'token-expired' && opts.refreshAction) {
     // 원클릭 갱신: claude CLI 최소 호출 1회로 CLI 자신의 정규 토큰 갱신을 트리거(R30).
     // 우리는 토큰을 직접 다루지 않는다 — Phase 2 read-only 결정 유지.
     // login-required(refresh token까지 죽음)면 버튼을 보여주지 않는다 — 재로그인만 해결(가짜 희망 금지, 실측 2026-07-10).
-    console.log(`  갱신하기 (Claude 1회 호출) | bash=${shellArg(path.join(root, 'scripts', 'refresh-claude-token.sh'))} param1=${shellArg(process.execPath)} terminal=false`);
+    console.log(`  토큰 갱신하기 (Claude 1회 호출) | bash=${shellArg(path.join(root, 'scripts', 'refresh-claude-token.sh'))} param1=${shellArg(process.execPath)} terminal=false`);
     console.log(`  터미널에서 claude를 한 번 실행해도 갱신돼요 | color=${SUBTLE}`);
     printRefreshFailure(dataMeta);
   }

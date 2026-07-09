@@ -65,8 +65,12 @@ function staleNote(dataMeta) {
   if (!dataMeta?.measuredAt) return null;
   const mins = minutesSince(dataMeta.measuredAt);
   if (dataMeta.fresh && mins !== null && mins < 10) return null;
+  // 마지막 수집은 성공, 나이만 넘김 — 곧 자동 수집이 따라잡는 무해한 상태(플러그인과 같은 규칙).
+  if (dataMeta.fresh) {
+    return el('p', 'stale-note', `⚠️ 옛 데이터(${agoLabel(dataMeta.measuredAt)}) — 잠시 후 자동 갱신 · 메뉴바 "새로고침"으로 즉시`);
+  }
   const reasonText = {
-    'token-expired': 'Claude 토큰 만료 · 메뉴바 "갱신하기" 또는 터미널에서 claude 실행하면 갱신',
+    'token-expired': 'Claude 토큰 만료 · 메뉴바 "토큰 갱신하기" 또는 터미널에서 claude 실행하면 갱신',
     'login-required': 'Claude 로그인 풀림 · 터미널에서 claude 실행 후 /login 필요',
     'no-token': 'Claude Code CLI 로그인 이력 없음',
     'keychain-denied': '키체인 접근 실패',
