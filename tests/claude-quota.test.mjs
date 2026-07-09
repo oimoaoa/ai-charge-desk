@@ -14,6 +14,7 @@ const emptyCache = path.join(root, 'empty-cache.json');
 const noneResult = await collectClaudeQuota({ keychainService: BOGUS_SERVICE, cachePath: emptyCache });
 assert.equal(noneResult.status, 'unavailable', 'no keychain + no cache → unavailable');
 assert.equal(noneResult.metrics.length, 0, 'unavailable must not invent metrics');
+assert.equal(noneResult.staleReason, 'no-token', 'keychain item not found(44) = 로그인 이력 없음 (R29)');
 
 // (2) 캐시 있음 → stale로 마지막 성공값 표시 + 라벨 재계산
 const cachePath = path.join(root, 'quota-cache.json');
@@ -34,6 +35,22 @@ assert.equal(staleResult.metrics.length, 1);
 assert.equal(staleResult.metrics[0].usedPercent, 75);
 assert.equal(staleResult.metrics[0].tier, 'warning', '75% with 70/90 thresholds → warning');
 assert.equal(staleResult.measuredAt, '2026-07-09T09:00:00.000Z', 'stale keeps original measured time');
+assert.equal(staleResult.staleReason, 'no-token', 'stale carries a structured reason (R29)');
+
+// (2b) 사유 분류(R29 — 실측 2026-07-10 로그인 풀림 사건 반영):
+//   만료 + refresh 살아있음 → token-expired(갱신 버튼으로 해결)
+//   만료 + refresh 죽음/없음 → login-required(재로그인만 해결 — 버튼 금지)
+//   항목은 있는데 토큰 비어있음(CLI가 갱신 실패 후 정리) → login-required
+const cred = (over) => async () => ({
+  accessToken: 'test-token-not-used', expiresAt: Date.now() - 1000, subscriptionType: 'max',
+  hasRefreshToken: true, refreshTokenExpiresAt: Date.now() + 3_600_000, ...over
+});
+const expired = await collectClaudeQuota({ readCredential: cred({}), cachePath: emptyCache });
+assert.equal(expired.staleReason, 'token-expired', 'expired access + alive refresh → token-expired');
+const refreshDead = await collectClaudeQuota({ readCredential: cred({ refreshTokenExpiresAt: Date.now() - 1000 }), cachePath: emptyCache });
+assert.equal(refreshDead.staleReason, 'login-required', 'expired access + dead refresh → login-required');
+const cleared = await collectClaudeQuota({ readCredential: cred({ accessToken: null, hasRefreshToken: false }), cachePath: emptyCache });
+assert.equal(cleared.staleReason, 'login-required', 'cleared tokens(로그인 풀림) → login-required');
 
 // (3) 모델 전용(weekly_scoped) 사용률의 종료 대비 거동 — 2026-07-12 Fable 창 종료 대비.
 //   ⓐ scoped 0% → 숨김(정보가치 없음) ⓑ session/weekly_all 0% → 리셋 직후 정상이라 표시

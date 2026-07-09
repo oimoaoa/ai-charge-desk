@@ -46,8 +46,10 @@ export async function buildSnapshot(options = {}) {
       staleAfterMinutes: CONFIG.staleAfterMinutes,
       isStale,
       data: {
-        claude: { measuredAt: claudeMeasuredAt, fresh: claudeFresh, ageLabel: claudeMeasuredAt ? formatAge(claudeMeasuredAt, now) : null },
-        codex: { measuredAt: codexMeasuredAt, fresh: codexFresh, ageLabel: codexMeasuredAt ? formatAge(codexMeasuredAt, now) : null }
+        // staleReason: 실시간 실패 사유 코드(token-expired 등) — 플러그인·대시보드가 원인별 안내를 고른다(R29).
+        // Codex는 아직 사유를 구조화하지 않아 null(표시 계층은 일반 문구로 처리).
+        claude: { measuredAt: claudeMeasuredAt, fresh: claudeFresh, ageLabel: claudeMeasuredAt ? formatAge(claudeMeasuredAt, now) : null, staleReason: claude.latestUsage?.staleReason ?? null },
+        codex: { measuredAt: codexMeasuredAt, fresh: codexFresh, ageLabel: codexMeasuredAt ? formatAge(codexMeasuredAt, now) : null, staleReason: null }
       },
       exchange: {
         rate: exchange.rate,

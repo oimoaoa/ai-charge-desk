@@ -23,9 +23,13 @@ export async function collectClaudeUsage(options = {}) {
   const quota = await collectClaudeQuota({ warningThreshold, dangerThreshold });
   metrics.push(...quota.metrics);
   audit.push(...quota.audit);
-  if (quota.measuredAt) {
-    latestUsage = { measuredAt: quota.measuredAt, fresh: quota.fresh, quotaStatus: quota.status };
-  }
+  // measuredAt이 없어도(캐시조차 없는 미표시) 사유 코드는 전달한다 — 표시 계층이 안내 문구를 고를 근거.
+  latestUsage = {
+    measuredAt: quota.measuredAt ?? null,
+    fresh: quota.fresh,
+    quotaStatus: quota.status,
+    staleReason: quota.staleReason ?? null
+  };
 
   audit.push({
     source: 'ccusage',

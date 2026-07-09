@@ -55,12 +55,27 @@ function agoLabel(iso) {
 function renderServices(data) {
   const root = document.querySelector('#services');
   root.replaceChildren(
-    serviceCard('claude', data.services.claude),
-    serviceCard('codex', data.services.codex)
+    serviceCard('claude', data.services.claude, data.app?.data?.claude),
+    serviceCard('codex', data.services.codex, data.app?.data?.codex)
   );
 }
 
-function serviceCard(kind, service) {
+// 옛 데이터 판정·문구 — 플러그인(printStaleBlock)과 같은 규칙(R29).
+function staleNote(dataMeta) {
+  if (!dataMeta?.measuredAt) return null;
+  const mins = minutesSince(dataMeta.measuredAt);
+  if (dataMeta.fresh && mins !== null && mins < 10) return null;
+  const reasonText = {
+    'token-expired': 'Claude 토큰 만료 · 메뉴바 "갱신하기" 또는 터미널에서 claude 실행하면 갱신',
+    'login-required': 'Claude 로그인 풀림 · 터미널에서 claude 실행 후 /login 필요',
+    'no-token': 'Claude Code CLI 로그인 이력 없음',
+    'keychain-denied': '키체인 접근 실패',
+    'fetch-failed': '서버 조회 실패 · 자동 재시도 중'
+  }[dataMeta.staleReason];
+  return el('p', 'stale-note', `⚠️ 옛 데이터(${agoLabel(dataMeta.measuredAt)})${reasonText ? ` — ${reasonText}` : ''}`);
+}
+
+function serviceCard(kind, service, dataMeta) {
   const card = el('article', `service-card ${kind}`);
   const header = el('div', 'service-header');
   const titleBox = el('div');
@@ -73,7 +88,8 @@ function serviceCard(kind, service) {
   if (service.metrics && service.metrics.length > 0) {
     const list = el('div', 'metric-list');
     for (const metric of service.metrics) list.append(metricRow(metric));
-    card.append(zone('zone-usage', list));
+    const note = staleNote(dataMeta);
+    card.append(note ? zone('zone-usage', list, note) : zone('zone-usage', list));
   }
 
   if (service.facts && service.facts.length > 0) {

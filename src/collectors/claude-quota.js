@@ -25,15 +25,29 @@ export async function collectClaudeQuota(options = {}) {
   let token = null;
   let expiresAt = null;
   let planType = null;
+  let refreshAlive = false;
   let reason = null;
+  // stale/미표시 사유 코드 — 표시 계층이 원인별 안내(갱신 버튼·폴백)를 고르는 근거(R29).
+  // token-expired(갱신 버튼으로 해결) / login-required(재로그인만 해결 — 버튼 보여주면 가짜 희망) /
+  // no-token(로그인 이력 없음) / keychain-denied / fetch-failed. 토큰 값이 아니라 분류만 실린다.
+  let staleReason = null;
   try {
-    const cred = await readKeychainCredential(options.keychainService ?? KEYCHAIN_SERVICE);
+    const cred = await (options.readCredential ?? readKeychainCredential)(options.keychainService ?? KEYCHAIN_SERVICE);
     token = cred.accessToken;
     expiresAt = cred.expiresAt;
     planType = cred.subscriptionType; // 예: "max" (등급 표시용, 토큰 아님)
+    // refresh token은 "살아있는지"만 본다(값은 읽지도 옮기지도 않음). 만료시각이 없으면 살아있다고 가정.
+    refreshAlive = cred.hasRefreshToken && (!Number.isFinite(cred.refreshTokenExpiresAt) || Date.now() < cred.refreshTokenExpiresAt);
   } catch (error) {
-    // 키체인 접근 실패(예: 백그라운드에서 GUI 승인 프롬프트가 못 떠서). 가짜값 대신 정직 처리.
-    reason = `키체인 접근 실패: ${error.message}`;
+    if (error?.code === 44) {
+      // security 종료코드 44 = 항목 없음(errSecItemNotFound) → CLI 로그인 이력이 없는 것(접근 거부 아님).
+      reason = '키체인에 Claude Code 자격이 없음 — CLI 로그인 필요.';
+      staleReason = 'no-token';
+    } else {
+      // 키체인 접근 실패(예: 백그라운드에서 GUI 승인 프롬프트가 못 떠서). 가짜값 대신 정직 처리.
+      reason = `키체인 접근 실패: ${error.message}`;
+      staleReason = 'keychain-denied';
+    }
   }
 
   const tokenValid = token && Number.isFinite(expiresAt) && Date.now() < expiresAt - 60_000;
@@ -46,25 +60,37 @@ export async function collectClaudeQuota(options = {}) {
       if (metrics.length > 0) {
         await saveCache(cachePath, metrics);
         audit.push({ source: 'claude.oauth.usage', status: 'confirmed', detail: '실시간 사용률 조회 성공(토큰 미출력).' });
-        return { status: 'ok', metrics, measuredAt: new Date().toISOString(), fresh: true, planType, audit };
+        return { status: 'ok', metrics, measuredAt: new Date().toISOString(), fresh: true, planType, staleReason: null, audit };
       }
       reason = '응답에 limits가 없어 사용률을 만들지 않음(가짜값 금지).';
+      staleReason = 'fetch-failed';
     } catch (error) {
       reason = `usage 조회 실패: ${error.message}`;
+      staleReason = 'fetch-failed';
     }
   } else if (!reason) {
-    reason = token ? 'access token 만료 — 갱신은 Claude Code에 맡김(refresh 안 함).' : '키체인에 access token 없음.';
+    if (!token) {
+      // 항목은 있는데 토큰이 비어 있음 = CLI가 갱신 실패 후 정리한 상태(실측 2026-07-10) → 재로그인만 해결.
+      reason = '키체인에 access token 없음(로그인 풀림) — claude 실행 후 /login 필요.';
+      staleReason = 'login-required';
+    } else if (refreshAlive) {
+      reason = 'access token 만료 — 갱신은 Claude Code에 맡김(refresh 안 함).';
+      staleReason = 'token-expired';
+    } else {
+      reason = 'access token 만료 + refresh token도 만료/없음 — 재로그인(/login)만 해결.';
+      staleReason = 'login-required';
+    }
   }
 
   // 3) 실시간 실패 → 마지막 성공값(stale)을 "오래됨"으로 정직 표시
   const cached = await loadCache(cachePath, warningThreshold, dangerThreshold);
   if (cached) {
     audit.push({ source: displayPath(cachePath), status: 'warning', detail: `실시간 조회 불가(${reason}) → 마지막 성공값 표시.` });
-    return { status: 'stale', metrics: cached.metrics, measuredAt: cached.measuredAt, fresh: false, audit };
+    return { status: 'stale', metrics: cached.metrics, measuredAt: cached.measuredAt, fresh: false, planType, staleReason, audit };
   }
 
   audit.push({ source: 'claude.oauth.usage', status: 'unavailable', detail: reason ?? '사용률 미확보.' });
-  return { status: 'unavailable', metrics: [], measuredAt: null, fresh: false, audit };
+  return { status: 'unavailable', metrics: [], measuredAt: null, fresh: false, planType, staleReason, audit };
 }
 
 // oauth/usage 응답의 limits[]를 R2/R3/R4로 매핑한다(실측 스키마 2026-07-09).
@@ -122,7 +148,10 @@ async function readKeychainCredential(service) {
   return {
     accessToken: oauth?.accessToken ?? null,
     expiresAt: Number.isFinite(Number(oauth?.expiresAt)) ? Number(oauth.expiresAt) : null,
-    subscriptionType: oauth?.subscriptionType ?? null
+    subscriptionType: oauth?.subscriptionType ?? null,
+    // refresh token은 존재 여부·만료시각만(값은 반환하지 않음 — 우리는 refresh하지 않는다).
+    hasRefreshToken: Boolean(oauth?.refreshToken),
+    refreshTokenExpiresAt: Number.isFinite(Number(oauth?.refreshTokenExpiresAt)) ? Number(oauth.refreshTokenExpiresAt) : null
   };
 }
 

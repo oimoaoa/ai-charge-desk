@@ -76,6 +76,9 @@ h3 { margin: 0; font-size: 20px; }
 
 .freshness.is-stale { color: var(--danger); }
 
+/* 옛 데이터 안내(R29): 사용률 존 아래 한 줄 — 나이 + 원인 + 해법 */
+.stale-note { margin: 8px 0 0; font-size: 13px; font-weight: 400; color: #9a6410; }
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
