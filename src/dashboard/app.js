@@ -31,9 +31,8 @@ async function loadSnapshot() {
 function renderFreshness(data) {
   const node = document.querySelector('#freshness');
   const mins = minutesSince(data.app.generatedAt);
-  // 갱신 방법을 괄호로 상시 안내(연 시점 스냅샷이라 켜둔 탭은 ⌘R 필요).
-  node.textContent = `업데이트: ${agoLabel(data.app.generatedAt)} (갱신: 메뉴바 새로고침 → ⌘R)`;
-  node.title = '이 페이지는 연 시점의 스냅샷 기준. 메뉴바 "새로고침"으로 수집한 뒤 브라우저 새로고침(⌘R)하면 최신이 됩니다.';
+  node.textContent = `업데이트: ${agoLabel(data.app.generatedAt)}`;
+  node.title = '이 페이지는 연 시점의 스냅샷 기준. 메뉴바 "새로고침"(사용률·비용·환율 재수집) 뒤 브라우저 새로고침(⌘R)하면 최신이 됩니다.';
   node.classList.toggle('is-stale', mins !== null && mins > 30);
 }
 
@@ -182,12 +181,13 @@ function factValue(fact) {
 }
 
 function exchangeNote() {
+  // 우상단 한 줄 메타에 인라인으로 끼므로 span으로 만든다.
   if (Number.isFinite(exchange.rate)) {
     const stamp = exchange.stale ? ' · 옛 환율' : '';
-    return el('p', `fx-note${exchange.stale ? ' is-stale' : ''}`,
+    return el('span', `fx-note${exchange.stale ? ' is-stale' : ''}`,
       `₩ 환산 기준: $1 ≈ ${formatKrw(exchange.rate)}${stamp}`);
   }
-  return el('p', 'fx-note is-stale', '₩ 환산: 환율을 못 받아 표시 못 함 (달러만)');
+  return el('span', 'fx-note is-stale', '₩ 환산: 환율을 못 받아 표시 못 함 (달러만)');
 }
 
 function formatKrw(value) {

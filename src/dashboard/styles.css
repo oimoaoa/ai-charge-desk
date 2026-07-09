@@ -65,13 +65,13 @@ h1 { margin: 0; font-size: 34px; line-height: 1.08; }
 h2 { margin: 0; font-size: 20px; }
 h3 { margin: 0; font-size: 20px; }
 
-/* 우상단 메타: 업데이트 시각 + ₩ 환산 기준(장식 없는 민텍스트) */
-.top-meta { display: grid; gap: 4px; text-align: right; }
-
-.freshness {
+/* 우상단 메타: 업데이트 시각 · 갱신 방법 · ₩ 환산 — PC 한 줄(· 구분), 모바일 3줄. 13px 통일 */
+.top-meta {
+  text-align: right;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .freshness.is-stale { color: var(--danger); }
@@ -194,12 +194,7 @@ h3 { margin: 0; font-size: 20px; }
 .model-row span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 400; }
 .model-row b { font-size: 14px; font-weight: 850; white-space: nowrap; }
 
-.fx-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-}
+.fx-note { font: inherit; color: inherit; }
 .fx-note.is-stale { color: var(--danger); }
 
 /* 초기화 이용권: 칩 대신 개수 + 만료일 리스트(날짜 전부 보이게) */
@@ -251,6 +246,8 @@ h3 { margin: 0; font-size: 20px; }
   .app-shell { width: min(100vw - 28px, 680px); }
   .topbar, .section-heading { align-items: start; flex-direction: column; }
   .summary-grid, .definition-grid, .audit-grid { grid-template-columns: 1fr; }
-  /* 세로 배치에선 우상단 메타도 좌정렬(타이틀과 같은 선) */
+  /* 세로 배치에선 우상단 메타를 좌정렬 + 3줄로(구분점 숨김) */
   .top-meta { text-align: left; }
+  .top-meta > span { display: block; }
+  .top-meta > .meta-sep { display: none; }
 }
