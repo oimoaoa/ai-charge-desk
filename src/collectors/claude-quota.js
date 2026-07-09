@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { CONFIG, displayPath } from '../config.js';
 import { makeUsageMetric } from '../lib/progress.js';
-import { formatResetKstFromIso } from '../lib/time.js';
+import { formatResetKstFromIso, resetLabelOrIdle } from '../lib/time.js';
 
 const execFileAsync = promisify(execFile);
 const KEYCHAIN_SERVICE = 'Claude Code-credentials';
@@ -104,7 +104,8 @@ export function mapLimits(payload, warningThreshold, dangerThreshold) {
         label,
         usedPercent: lim.percent,
         resetAt: lim.resets_at ?? null,
-        resetLabel: formatResetKstFromIso(lim.resets_at),
+        // 리셋 직후엔 활성 창이 없어 resets_at이 안 온다(0%) → "사용 시작 전"으로 설명.
+        resetLabel: resetLabelOrIdle(lim.resets_at, lim.percent),
         source: `claude.oauth.usage.limits.${lim.kind}`,
         warningThreshold,
         dangerThreshold

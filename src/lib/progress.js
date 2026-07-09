@@ -50,7 +50,7 @@ export function makeUsageMetric({
     dangerThreshold,
     isWarning: used !== null && used >= warningThreshold,
     resetAt: resetAt ?? null,
-    resetLabel: resetLabel ?? 'reset unknown',
+    resetLabel: resetLabel ?? '리셋 시각 미확인',
     windowMinutes: Number.isFinite(windowMinutes) ? windowMinutes : null,
     windowStart: windowStart ?? null,
     windowEnd: windowEnd ?? null,

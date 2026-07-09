@@ -33,17 +33,26 @@ function stampKst(value, { now = new Date(), alwaysYear = false } = {}) {
   return `${yearPrefix}${get('month')}-${get('day')}(${weekday}) ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-// 리셋 시각: "2026-07-12(일) 17:00 · 2일 21시간 후".
+// 리셋 시각: "07-12(일) 17:00 · 2일 21시간 후".
 export function formatResetKst(epochSeconds, now = new Date()) {
-  if (!Number.isFinite(epochSeconds)) return 'reset unknown';
+  if (!Number.isFinite(epochSeconds)) return '리셋 시각 미확인';
   return `${formatStampKst(new Date(epochSeconds * 1000))} · ${relativeKorean(epochSeconds, now)}`;
 }
 
 // ISO 문자열 버전(Claude 등에서 사용).
 export function formatResetKstFromIso(value, now = new Date()) {
   const date = toDate(value);
-  if (!date) return 'reset unknown';
+  if (!date) return '리셋 시각 미확인';
   return formatResetKst(date.getTime() / 1000, now);
+}
+
+// 리셋 시각이 없을 때의 설명: 창(window)은 첫 사용 순간 열리므로,
+// 0% + 시각 없음 = "아직 창이 없다"(정상). 사용량이 있는데 시각만 없으면 진짜 미확인.
+export function resetLabelOrIdle(resetValue, usedPercent, now = new Date()) {
+  const date = toDate(resetValue);
+  if (date) return formatResetKst(date.getTime() / 1000, now);
+  if (usedPercent === 0) return '사용 시작 전 — 다음 사용부터 창 시작';
+  return '리셋 시각 미확인';
 }
 
 // 집계 기간 "시작 ~ 종료": "07-01(수) 00:00 ~ 07-09(목) 19:33".

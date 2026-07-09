@@ -186,7 +186,10 @@ function windowMetric(id, windowData, label, warningThreshold, dangerThreshold, 
     label,
     usedPercent: windowData.used_percent,
     resetAt: end,
-    resetLabel: Number.isFinite(windowData.resets_at) ? formatResetKst(windowData.resets_at) : 'reset unknown',
+    // 리셋 직후엔 활성 창이 없어 resets_at이 없을 수 있다(0%) → "사용 시작 전"으로 설명.
+    resetLabel: Number.isFinite(windowData.resets_at)
+      ? formatResetKst(windowData.resets_at)
+      : (windowData.used_percent === 0 ? '사용 시작 전 — 다음 사용부터 창 시작' : '리셋 시각 미확인'),
     windowMinutes: windowData.window_minutes,
     windowStart: start ? start.toISOString() : null,
     windowEnd: end,
