@@ -175,7 +175,8 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
 
 function printStaleBlock(dataMeta, staleReason, opts) {
   const reasonText = STALE_REASON_TEXT[staleReason];
-  console.log(`  ⚠️ 옛 데이터(${agoLabel(dataMeta.measuredAt)})${reasonText ? ` — ${reasonText}` : ''} | color=${WARN}`);
+  // 색은 코랄레드(DANGER, 막대 위험색과 동일) — 주황(WARN)은 라이트 메뉴에서 흐려서 안 보임(제품 결정 2026-07-10).
+  console.log(`  ⚠️ 옛 데이터(${agoLabel(dataMeta.measuredAt)})${reasonText ? ` — ${reasonText}` : ''} | color=${DANGER}`);
   if (staleReason === 'token-expired' && opts.refreshAction) {
     // 원클릭 갱신: claude CLI 최소 호출 1회로 CLI 자신의 정규 토큰 갱신을 트리거(R30).
     // 우리는 토큰을 직접 다루지 않는다 — Phase 2 read-only 결정 유지.

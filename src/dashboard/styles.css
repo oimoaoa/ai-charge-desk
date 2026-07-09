@@ -76,8 +76,8 @@ h3 { margin: 0; font-size: 20px; }
 
 .freshness.is-stale { color: var(--danger); }
 
-/* 옛 데이터 안내(R29): 사용률 존 아래 한 줄 — 나이 + 원인 + 해법 */
-.stale-note { margin: 8px 0 0; font-size: 13px; font-weight: 400; color: #9a6410; }
+/* 옛 데이터 안내(R29): 사용률 존 아래 한 줄 — 나이 + 원인 + 해법. 색은 드롭다운과 동일한 코랄레드(제품 결정 2026-07-10) */
+.stale-note { margin: 8px 0 0; font-size: 13px; font-weight: 400; color: var(--danger); }
 
 .summary-grid {
   display: grid;
