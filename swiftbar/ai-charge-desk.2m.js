@@ -55,9 +55,10 @@ console.log(`${claudeHead}  ${codexHead}${headColor ? ` | color=${headColor}` : 
 console.log('---');
 // href는 공백·특수문자 경로에서도 열리게 file URL로 인코딩한다.
 console.log(`대시보드 열기 | href=${pathToFileURL(dashboardFile).href}`);
-// 주의: `env node`는 SwiftBar의 최소 PATH에서 node를 못 찾는다(비표준 설치 위치 함정).
-// 지금 플러그인을 실행 중인 node의 절대 경로(process.execPath)로 실행해야 1클릭에 재수집된다.
-console.log(`새로고침 | bash=${shellArg(process.execPath)} param1=${shellArg(buildScript)} terminal=false refresh=true`);
+// 새로고침은 래퍼 스크립트로: 수집이 "끝난 뒤" swiftbar:// URL로 다시 그리게 순서를 강제한다.
+// (refresh=true만 쓰면 SwiftBar가 명령 종료를 안 기다리고 즉시 다시 그려 옛 스냅샷이 보일 수 있음.)
+// node 경로는 process.execPath로 전달 — SwiftBar 최소 PATH에서 env node가 안 잡히는 함정 대비.
+console.log(`새로고침 | bash=${shellArg(path.join(root, 'scripts', 'swiftbar-refresh.sh'))} param1=${shellArg(process.execPath)} terminal=false`);
 console.log('---');
 printService('Claude Code', CLAUDE, claude, snapshot?.app?.data?.claude);
 console.log('---');
