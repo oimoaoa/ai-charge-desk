@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { CONFIG, displayPath } from '../config.js';
 import { listFilesRecursive, readJsonlObjects } from '../lib/jsonl.js';
 import { makeUsageMetric } from '../lib/progress.js';
+import { formatUsd } from '../lib/money.js';
 import {
   formatResetKst,
   toIsoFromEpochSeconds,
@@ -244,7 +245,7 @@ function codexRangeItems(daily, startDate, now, group) {
 
   const items = [{
     label: '', // 그룹 헤더가 타이틀 역할
-    value: `$${totalCost.toFixed(1)}`,
+    value: formatUsd(totalCost),
     rawCost: totalCost,
     detail: `${compactNumber(totalTokens)} tokens`,
     period: formatKstDateRange(startDate, now),

@@ -31,8 +31,9 @@ async function loadSnapshot() {
 function renderFreshness(data) {
   const node = document.querySelector('#freshness');
   const mins = minutesSince(data.app.generatedAt);
-  node.textContent = `업데이트: ${agoLabel(data.app.generatedAt)}`;
-  node.title = '이 페이지를 연 시점의 스냅샷 기준. 드롭다운 "새로고침" 후에는 브라우저 새로고침(⌘R)으로 최신을 불러오세요.';
+  // 갱신 방법을 괄호로 상시 안내(연 시점 스냅샷이라 켜둔 탭은 ⌘R 필요).
+  node.textContent = `업데이트: ${agoLabel(data.app.generatedAt)} (갱신: 메뉴바 새로고침 → ⌘R)`;
+  node.title = '이 페이지는 연 시점의 스냅샷 기준. 메뉴바 "새로고침"으로 수집한 뒤 브라우저 새로고침(⌘R)하면 최신이 됩니다.';
   node.classList.toggle('is-stale', mins !== null && mins > 30);
 }
 
