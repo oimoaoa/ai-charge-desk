@@ -41,7 +41,7 @@ function minutesSince(iso) {
 
 function agoLabel(iso) {
   const m = minutesSince(iso);
-  if (m === null) return 'unknown';
+  if (m === null) return '미확인';
   if (m < 1) return '방금';
   if (m < 60) return `${m}분 전`;
   const h = Math.floor(m / 60);
@@ -225,10 +225,10 @@ function renderAudit(data) {
 }
 
 function metaText(service) {
-  // 플랜 등급(max/plus)을 보여준다. 데이터 나이는 우상단 "업데이트"로 일원화(중복 제거).
+  // 플랜 등급(max/plus)을 보여준다. 등급 정보가 없으면 영어 상태값을 노출하지 않고 비워둔다.
   const plan = service.planType;
   if (typeof plan === 'string' && plan) return plan.toUpperCase();
-  return service.status;
+  return '';
 }
 
 function el(tag, className = '', text = '') {

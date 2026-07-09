@@ -65,7 +65,7 @@ printService('Codex', CODEX, codex, snapshot?.app?.data?.codex);
 printCredits(codex?.resetCredits);
 console.log('---');
 // "새로고침 시각"(스냅샷 생성 = generatedAt) — 데이터 나이가 아니라 언제 다시 계산했는지.
-const refreshedAgo = snapshot?.app?.generatedAt ? agoLabel(snapshot.app.generatedAt) : 'missing';
+const refreshedAgo = snapshot?.app?.generatedAt ? agoLabel(snapshot.app.generatedAt) : '기록 없음';
 console.log(`새로고침: ${refreshedAgo} | color=${SUBTLE}`);
 console.log(`프로젝트 폴더 | href=${pathToFileURL(root).href}`);
 
@@ -185,7 +185,7 @@ function minutesSince(iso) {
 
 function agoLabel(iso) {
   const m = minutesSince(iso);
-  if (m === null) return 'unknown';
+  if (m === null) return '미확인';
   if (m < 1) return '방금';
   if (m < 60) return `${m}분 전`;
   const h = Math.floor(m / 60);

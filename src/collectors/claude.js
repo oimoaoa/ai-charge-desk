@@ -14,7 +14,7 @@ export async function collectClaudeUsage(options = {}) {
   const dangerThreshold = options.dangerThreshold ?? CONFIG.dangerThreshold;
   const audit = [];
   const ccusagePath = await findExecutable('ccusage');
-  const cost = ccusagePath ? await collectCost(ccusagePath) : { today: [], weekly: [], monthly: [], weeklyPeriod: null };
+  const cost = ccusagePath ? await collectCost(ccusagePath) : { today: [], weekly: [], monthly: [] };
   const metrics = [];
   let latestUsage = null;
 
@@ -33,6 +33,10 @@ export async function collectClaudeUsage(options = {}) {
       ? `Found ccusage at ${displayPath(ccusagePath)}.`
       : 'ccusage command is not installed, so Claude token cost breakdown cannot be read.'
   });
+  // ccusage가 있는데 실행이 실패하면 비용이 조용히 사라진다 — audit에 흔적을 남긴다(No Silent Fallback).
+  if (cost.failed) {
+    audit.push({ source: 'ccusage', status: 'warning', detail: `ccusage 실행 실패 — 비용 미표시. (${cost.failed})` });
+  }
   // (제거됨) Phase 1의 JSONL 키패스 탐색 audit — quota 소스가 /api/oauth/usage로 확정되어
   // 어떤 지표에도 안 쓰이는데 'candidate' 표시가 "수집 실패"처럼 오독돼 삭제(2026-07-09 결정).
 
@@ -84,8 +88,9 @@ async function collectCost(ccusagePath) {
       { timeout: 20000, maxBuffer: 10 * 1024 * 1024 }
     );
     daily = JSON.parse(stdout).daily ?? [];
-  } catch {
-    return { today: [], weekly: [], monthly: [] };
+  } catch (error) {
+    // 실행 실패(≠사용량 0)는 비용을 못 구한 것 — 빈 값 + 실패 사유(호출부가 audit에 기록).
+    return { today: [], weekly: [], monthly: [], failed: error.message };
   }
 
   return {
@@ -96,10 +101,10 @@ async function collectCost(ccusagePath) {
 }
 
 // 특정 날부터 오늘까지 일별을 합산해 [총액(라벨 없음) + 모델별]을 만든다.
+// 사용량이 0이어도(월초·새 설치) 총액 $0.0은 표시한다 — "성공했는데 0"과 "못 구함"을 섞지 않기 위함.
 function rangeItems(daily, startDate, now, group) {
   const startKey = kstDateKey(startDate);
   const buckets = daily.filter((day) => day.date >= startKey);
-  if (buckets.length === 0) return [];
   const totalCost = buckets.reduce((sum, day) => sum + numberOrZero(day.totalCost), 0);
   const totalTokens = buckets.reduce((sum, day) => sum + totalTokensFrom(day), 0);
 

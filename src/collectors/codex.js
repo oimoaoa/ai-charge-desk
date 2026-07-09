@@ -37,6 +37,9 @@ export async function collectCodexUsage(options = {}) {
     if (result.metrics.length > 0) {
       const costFacts = ccusagePath ? await collectCodexCostFacts(ccusagePath) : { items: [] };
       audit.push({ source: 'codex.wham.usage', status: 'confirmed', detail: '실시간 사용률 조회 성공(토큰 미출력).' });
+      if (costFacts.failed) {
+        audit.push({ source: 'ccusage', status: 'warning', detail: `ccusage 실행 실패 — 비용 미표시. (${costFacts.failed})` });
+      }
       return {
         status: 'ok',
         name: 'Codex',
@@ -156,6 +159,9 @@ async function collectFromSessions(sessionsDir, ccusagePath, warningThreshold, d
   metrics.push(...windowMetric('codex-secondary', latest.rateLimits.secondary, '주간', warningThreshold, dangerThreshold, true, 'codex.session.secondary'));
 
   const costFacts = ccusagePath ? await collectCodexCostFacts(ccusagePath) : { items: [] };
+  if (costFacts.failed) {
+    audit.push({ source: 'ccusage', status: 'warning', detail: `ccusage 실행 실패 — 비용 미표시. (${costFacts.failed})` });
+  }
 
   return {
     status: metrics.length > 0 ? 'ok' : 'unavailable',
@@ -215,7 +221,6 @@ async function collectCodexCostFacts(ccusagePath) {
       { timeout: 20000, maxBuffer: 10 * 1024 * 1024 }
     );
     const daily = JSON.parse(stdout).daily ?? [];
-    if (daily.length === 0) return { items: [] };
 
     return {
       items: [
@@ -224,15 +229,16 @@ async function collectCodexCostFacts(ccusagePath) {
         ...codexRangeItems(daily, todayStart, now, 'today')
       ]
     };
-  } catch {
-    return { items: [] };
+  } catch (error) {
+    // 실행 실패(≠사용량 0)는 비용을 못 구한 것 — 빈 값 + 실패 사유(호출부가 audit에 기록).
+    return { items: [], failed: error.message };
   }
 }
 
+// 사용량이 0이어도(월초·새 설치) 총액 $0.0은 표시한다 — "성공했는데 0"과 "못 구함"을 섞지 않기 위함.
 function codexRangeItems(daily, startDate, now, group) {
   const startKey = kstDateKey(startDate);
   const buckets = daily.filter((day) => day.date >= startKey);
-  if (buckets.length === 0) return [];
   const totalCost = buckets.reduce((sum, day) => sum + numberOrZero(day.costUSD), 0);
   const totalTokens = buckets.reduce((sum, day) => sum + numberOrZero(day.totalTokens), 0);
 
