@@ -86,8 +86,11 @@ function serviceCard(kind, service) {
   }
 
   if (kind === 'codex') {
+    // Codex를 아예 안 쓰는 사용자(카드가 비어 안내문만 있음)에겐 이용권 실패 박스를 겹쳐 보이지 않는다.
+    // Codex 데이터가 있는데 이용권 조회만 실패한 경우엔 실패를 그대로 보여준다(은폐 아님).
+    const hasContent = (service.metrics?.length ?? 0) > 0 || (service.facts?.length ?? 0) > 0;
     const credits = resetCredits(service.resetCredits);
-    if (credits) card.append(credits);
+    if (credits && (hasContent || service.resetCredits?.status === 'ok')) card.append(credits);
   }
   return card;
 }
@@ -199,7 +202,7 @@ function resetCredits(data) {
   const box = el('div', 'credits');
   if (!data || data.status !== 'ok') {
     box.append(el('p', 'credit-title', '초기화 이용권'));
-    box.append(el('p', 'credit-date', data?.status ?? 'unavailable'));
+    box.append(el('p', 'credit-date', `조회 못 함 — ${statusLabel(data?.status ?? 'unavailable')}`));
     return box;
   }
   box.append(el('p', 'credit-title', `초기화 이용권 ${data.availableCount ?? '--'}개 남음`));
