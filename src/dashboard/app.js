@@ -5,6 +5,9 @@ renderFreshness(snapshot);
 renderExchange();
 renderServices(snapshot);
 renderAudit(snapshot);
+// 자립형(file://) 페이지는 연 시점의 스냅샷 고정 — 탭을 열어둔 동안에도
+// "업데이트: N분 전" 나이 표기만은 계속 정확하게 자라도록 주기 재계산한다.
+setInterval(() => renderFreshness(snapshot), 30000);
 
 // ₩ 환산 기준은 카드마다 반복하지 않고 우상단(업데이트 아래) 한 곳에만.
 function renderExchange() {
@@ -29,7 +32,7 @@ function renderFreshness(data) {
   const node = document.querySelector('#freshness');
   const mins = minutesSince(data.app.generatedAt);
   node.textContent = `업데이트: ${agoLabel(data.app.generatedAt)}`;
-  node.title = '이 숫자를 마지막으로 새로고침(수집)한 시각. 새로고침하면 갱신됨.';
+  node.title = '이 페이지를 연 시점의 스냅샷 기준. 드롭다운 "새로고침" 후에는 브라우저 새로고침(⌘R)으로 최신을 불러오세요.';
   node.classList.toggle('is-stale', mins !== null && mins > 30);
 }
 
