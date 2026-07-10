@@ -32,6 +32,8 @@ const SUBTLE = '#5b6470,#aab4c4'; // 보조(비용·데이터 나이) — 이전
 const CLAUDE = '#d6407a,#ff5f9c'; // 서비스 헤더색(핑크, 다크서 흐리지 않게 채도 올림)
 const CODEX = '#1a7fd4,#3fa9ff';  // 서비스 헤더색(블루, 동일)
 const COST_TITLE = { monthly: '이번 달 누적 비용', weekly: '이번 주 누적 비용', today: '오늘 누적 비용' };
+// 버튼 공통 아이콘 — "누르는 것"의 표식(전 버튼 동일, 데이터 줄엔 안 붙임).
+const BUTTON_ICON = 'chevron.right.circle';
 
 // stale 사유 코드(R29) → 사람이 읽는 원인. 없는 코드는 일반 문구로.
 // (플러그인은 top-level에서 바로 렌더하므로 상수는 여기 상단에 — 아래 함수들보다 먼저 초기화돼야 한다.)
@@ -73,12 +75,13 @@ const headColor = tierColor(worstTier([...claudeMetrics, ...codexMetrics]));
 console.log(`${claudeHead}  ${codexHead}${headColor ? ` | color=${headColor}` : ''}`);
 
 console.log('---');
-// href는 공백·특수문자 경로에서도 열리게 file URL로 인코딩한다.
-console.log(`대시보드 열기 | href=${pathToFileURL(dashboardFile).href}`);
+// 버튼(누르는 것)은 전부 같은 아이콘(SF Symbol chevron.right.circle)으로 데이터 줄과 구분한다(제품 결정 2026-07-10).
 // 새로고침은 래퍼 스크립트로: 수집이 "끝난 뒤" swiftbar:// URL로 다시 그리게 순서를 강제한다.
 // (refresh=true만 쓰면 SwiftBar가 명령 종료를 안 기다리고 즉시 다시 그려 옛 스냅샷이 보일 수 있음.)
 // node 경로는 process.execPath로 전달 — SwiftBar 최소 PATH에서 env node가 안 잡히는 함정 대비.
-console.log(`새로고침 | bash=${shellArg(path.join(root, 'scripts', 'swiftbar-refresh.sh'))} param1=${shellArg(process.execPath)} terminal=false`);
+console.log(`데이터 새로고침 | bash=${shellArg(path.join(root, 'scripts', 'swiftbar-refresh.sh'))} param1=${shellArg(process.execPath)} terminal=false sfimage=${BUTTON_ICON}`);
+// href는 공백·특수문자 경로에서도 열리게 file URL로 인코딩한다.
+console.log(`상세 대시보드 열기 | href=${pathToFileURL(dashboardFile).href} sfimage=${BUTTON_ICON}`);
 console.log('---');
 printService('Claude Code', CLAUDE, claude, claudeDataMeta, { refreshAction: true });
 console.log('---');
@@ -88,7 +91,24 @@ console.log('---');
 // "새로고침 시각"(스냅샷 생성 = generatedAt) — 데이터 나이가 아니라 언제 다시 계산했는지.
 const refreshedAgo = snapshot?.app?.generatedAt ? agoLabel(snapshot.app.generatedAt) : '기록 없음';
 console.log(`새로고침: ${refreshedAgo} | color=${SUBTLE}`);
-console.log(`프로젝트 폴더 | href=${pathToFileURL(root).href}`);
+console.log(`프로젝트 폴더 | href=${pathToFileURL(root).href} sfimage=${BUTTON_ICON}`);
+console.log(`v${appVersion()} · AI Charge Desk | size=11 color=${SUBTLE}`);
+
+// 사용률 미니 막대(10칸) — 쓴 만큼 채운다. %가 없으면 빈 문자열(막대 생략).
+function usageBar(percent) {
+  if (!Number.isFinite(percent)) return '';
+  const filled = Math.max(0, Math.min(10, Math.round(percent / 10)));
+  return '▓'.repeat(filled) + '░'.repeat(10 - filled);
+}
+
+// 버전은 package.json 한 곳에서(하드코딩 금지).
+function appVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version ?? '?';
+  } catch {
+    return '?';
+  }
+}
 
 function readSnapshot(filePath) {
   try {
@@ -162,7 +182,9 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
     console.log(`  사용률 미표시${hint ? ` — ${hint}` : ''} | color=${SUBTLE}`);
   } else {
     for (const metric of service.metrics) {
-      console.log(`  ${metric.label}: ${metric.usedPercent}% 사용 · ${metric.resetLabel} | color=${metricColor(metric)}`);
+      // 막대를 줄 맨 앞에 — 라벨 길이와 무관하게 막대들이 세로로 정렬된다(쓴 % 기준, R8).
+      const gauge = usageBar(metric.usedPercent);
+      console.log(`  ${gauge ? `${gauge} ` : ''}${metric.label}: ${metric.usedPercent}% 사용 · ${metric.resetLabel} | color=${metricColor(metric)}`);
     }
   }
   // 옛 데이터 안내: 나이 + 원인 + 해법(갱신 버튼·폴백) — R29·R30.
@@ -187,7 +209,7 @@ function printStaleBlock(dataMeta, staleReason, opts) {
     // 원클릭 갱신: claude CLI 최소 호출 1회로 CLI 자신의 정규 토큰 갱신을 트리거(R30).
     // 우리는 토큰을 직접 다루지 않는다 — Phase 2 read-only 결정 유지.
     // login-required(refresh token까지 죽음)면 버튼을 보여주지 않는다 — 재로그인만 해결(가짜 희망 금지, 실측 2026-07-10).
-    console.log(`  토큰 갱신하기 (Claude 1회 호출) | bash=${shellArg(path.join(root, 'scripts', 'refresh-claude-token.sh'))} param1=${shellArg(process.execPath)} terminal=false`);
+    console.log(`  토큰 갱신하기 (Claude 1회 호출) | bash=${shellArg(path.join(root, 'scripts', 'refresh-claude-token.sh'))} param1=${shellArg(process.execPath)} terminal=false sfimage=${BUTTON_ICON}`);
     console.log(`  터미널에서 claude를 한 번 실행해도 갱신돼요 | color=${SUBTLE}`);
     printRefreshFailure(dataMeta);
   }
