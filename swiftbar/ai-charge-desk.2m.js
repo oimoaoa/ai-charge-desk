@@ -194,6 +194,11 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
   if (!service || (service.metrics ?? []).length === 0) {
     const hint = UNAVAILABLE_HINT[staleReason];
     console.log(`  사용률 미표시${hint ? ` — ${hint}` : ''} | color=${SUBTLE}`);
+    // 인증 관련 미표시엔 "왜 안 나오는지"를 한 줄 더 — setup-token(CI용)·API 키 인증은
+    // 키체인을 안 거쳐 %가 구조적으로 미제공(구독자는 /login 한 번이면 살아남 — 2026-07-10 사용자 리포트).
+    if (opts.refreshAction && ['no-token', 'token-expired', 'login-required'].includes(staleReason)) {
+      console.log(`  %는 구독 로그인(키체인) 전용 — claude /login 한 번이면 살아나요 (setup-token·API 키 인증은 미제공) | color=${SUBTLE}`);
+    }
   } else {
     for (const metric of service.metrics) {
       // "라벨 막대 N% 사용 · 리셋" — 라벨 먼저(확정 레이아웃 2026-07-10), 막대는 쓴 % 기준(R8).

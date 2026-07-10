@@ -19,8 +19,15 @@ if (!cli) {
   result = { at: startedAt, status: 'cli-missing', detail: null };
 } else {
   try {
+    // env 인증(setup-token·API 키·게이트웨이 토큰)을 벗기고 호출한다 — 이 버튼의 목적은
+    // "키체인의 구독 OAuth"를 갱신시키는 것인데, env 인증이 있으면 우선순위상 키체인을 아예
+    // 안 거쳐 갱신이 되지 않는다(공식 인증 우선순위: env 5위 > 키체인 6위 — 2026-07-10 확인).
+    const env = { ...process.env };
+    delete env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete env.ANTHROPIC_API_KEY;
+    delete env.ANTHROPIC_AUTH_TOKEN;
     // stdin을 바로 닫는다 — 안 닫으면 CLI가 파이프 입력을 3초 기다린다(crossval에서 확인된 함정).
-    const pending = execFileAsync(cli, ['-p', 'ok', '--model', 'haiku'], { timeout: 180_000, maxBuffer: 1024 * 1024 });
+    const pending = execFileAsync(cli, ['-p', 'ok', '--model', 'haiku'], { timeout: 180_000, maxBuffer: 1024 * 1024, env });
     pending.child.stdin?.end();
     await pending;
     result = { at: new Date().toISOString(), status: 'ok', detail: null };
