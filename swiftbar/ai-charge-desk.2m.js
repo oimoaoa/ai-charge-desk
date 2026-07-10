@@ -34,6 +34,11 @@ const CODEX = '#1a7fd4,#3fa9ff';  // 서비스 헤더색(블루, 동일)
 const COST_TITLE = { monthly: '이번 달 누적 비용', weekly: '이번 주 누적 비용', today: '오늘 누적 비용' };
 // 버튼 공통 아이콘 — "누르는 것"의 표식(전 버튼 동일, 데이터 줄엔 안 붙임).
 const BUTTON_ICON = 'chevron.right.circle';
+// 막대 글리프 — 같은 Geometric Shapes 블록(U+25A0대)에서 골라야 크기가 균일하다.
+// (▓/░는 Block Elements 블록이라 폴백 폰트가 달라 메뉴에서 크기가 어긋남 — 실측 2026-07-10.)
+// 확정(제품 결정 2026-07-10): 채움 ■(꽉 참·모서리 라운딩은 수용) / 빈칸 ▤(가로줄) — 밝기 대비 최대와 실루엣 균일의 절충.
+const BAR_FILL = '■';
+const BAR_EMPTY = '▤';
 
 // stale 사유 코드(R29) → 사람이 읽는 원인. 없는 코드는 일반 문구로.
 // (플러그인은 top-level에서 바로 렌더하므로 상수는 여기 상단에 — 아래 함수들보다 먼저 초기화돼야 한다.)
@@ -93,11 +98,11 @@ console.log('---');
 console.log(`프로젝트 폴더 | href=${pathToFileURL(root).href} sfimage=${BUTTON_ICON}`);
 console.log(`v${appVersion()} · AI Charge Desk | size=11 color=${SUBTLE}`);
 
-// 사용률 미니 막대(10칸) — 쓴 만큼 차오른다. ■/□는 같은 크기 글리프(▓/░는 메뉴에서 크기가 달라 보임 — 제품 결정 2026-07-10).
+// 사용률 미니 막대(10칸) — 쓴 만큼 차오른다. 글리프는 상단 BAR_FILL/BAR_EMPTY 한 곳에서.
 function usageBar(percent) {
   if (!Number.isFinite(percent)) return '';
   const filled = Math.max(0, Math.min(10, Math.round(percent / 10)));
-  return '■'.repeat(filled) + '□'.repeat(10 - filled);
+  return BAR_FILL.repeat(filled) + BAR_EMPTY.repeat(10 - filled);
 }
 
 // 5시간 창(하루에 여러 번 리셋)은 날짜를 떼고 시간만 — 핵심만 간결하게(제품 결정 2026-07-10).
