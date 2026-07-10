@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -32,7 +33,7 @@ export async function collectClaudeQuota(options = {}) {
   // no-token(로그인 이력 없음) / keychain-denied / fetch-failed. 토큰 값이 아니라 분류만 실린다.
   let staleReason = null;
   try {
-    const cred = await (options.readCredential ?? readKeychainCredential)(options.keychainService ?? KEYCHAIN_SERVICE);
+    const cred = await resolveCredential(options);
     token = cred.accessToken;
     expiresAt = cred.expiresAt;
     planType = cred.subscriptionType; // 예: "max" (등급 표시용, 토큰 아님)
@@ -50,7 +51,7 @@ export async function collectClaudeQuota(options = {}) {
     }
   }
 
-  const tokenValid = token && Number.isFinite(expiresAt) && Date.now() < expiresAt - 60_000;
+  const tokenValid = isLiveToken({ accessToken: token, expiresAt });
 
   // 2) 유효 토큰이 있을 때만 실시간 조회 (만료면 refresh하지 않는다)
   if (tokenValid) {
@@ -141,8 +142,40 @@ export function mapLimits(payload, warningThreshold, dangerThreshold) {
   return out.sort((a, b) => a._order - b._order).map((entry) => entry.metric);
 }
 
-async function readKeychainCredential(service) {
-  const { stdout } = await execFileAsync('security', ['find-generic-password', '-s', service, '-w'], { timeout: 5000 });
+// 같은 서비스명 항목이 여러 개일 때 첫 매치(계정명 없는 만료 유령)가 진짜(acct=맥 사용자명) 항목을
+// 가릴 수 있다 — v0.1.6, 커뮤니티 리포트('토론토구리네'님 진단: 갱신·재로그인이 전부 무효처럼 보였던 원인).
+// 첫 매치가 죽어 있으면 맥 사용자명으로 "한 번만" 정조준한다. 항목 나열(dump-keychain)은 필요 이상으로
+// 넓은 동작이라 쓰지 않는다(최소 권한 — 실측된 유령 사례는 전부 acct=사용자명 정조준으로 해결됨).
+async function resolveCredential(options) {
+  const read = options.readCredential ?? readKeychainCredential;
+  if (options.keychainService) return read(options.keychainService); // 테스트·고정용: 기존 단일 조회 그대로
+  let first = null;
+  let firstError = null;
+  try {
+    first = await read(KEYCHAIN_SERVICE);
+    if (isLiveToken(first)) return first; // 정상 환경(항목 1개)은 여기서 끝 — 동작·비용 불변
+  } catch (error) {
+    firstError = error;
+  }
+  let targeted = null;
+  try {
+    targeted = await read(KEYCHAIN_SERVICE, options.fallbackAccount ?? os.userInfo().username);
+  } catch { /* 정조준 항목 없음 → 첫 매치 결과로 정직 분류 */ }
+  // 정조준 항목은 CLI가 실제로 갱신하는 쪽 — 죽어 있어도 사유 분류(R29)의 근거로 우선한다.
+  if (targeted) return targeted;
+  if (first) return first;
+  throw firstError ?? Object.assign(new Error('keychain credential not found'), { code: 44 });
+}
+
+function isLiveToken(cred) {
+  return Boolean(cred?.accessToken) && Number.isFinite(cred.expiresAt) && Date.now() < cred.expiresAt - 60_000;
+}
+
+async function readKeychainCredential(service, account) {
+  const args = ['find-generic-password', '-s', service];
+  if (account) args.push('-a', account); // 계정 정조준 — 같은 서비스명 중복 시 첫 매치(유령) 회피
+  args.push('-w');
+  const { stdout } = await execFileAsync('security', args, { timeout: 5000 });
   const parsed = JSON.parse(stdout.trim());
   const oauth = parsed?.claudeAiOauth ?? parsed;
   return {

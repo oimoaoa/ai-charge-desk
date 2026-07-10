@@ -52,6 +52,39 @@ assert.equal(refreshDead.staleReason, 'login-required', 'expired access + dead r
 const cleared = await collectClaudeQuota({ readCredential: cred({ accessToken: null, hasRefreshToken: false }), cachePath: emptyCache });
 assert.equal(cleared.staleReason, 'login-required', 'cleared tokens(로그인 풀림) → login-required');
 
+// (2c) v0.1.6 — 같은 서비스명 중복(유령) 항목 fallback. 커뮤니티 리포트('토론토구리네'님) 실측:
+//     acct 없는 만료 유령이 첫 매치를 가로채 CLI가 매일 갱신하는 진짜 항목(acct=사용자명)이 영영 안 읽힘.
+//   ⓐ 첫 매치 만료 + 사용자명 정조준으로 살아있는 항목 → 그 토큰으로 실시간 조회까지 간다
+//      (막힌 로컬 포트 endpoint로 네트워크 없이 검증 — staleReason이 만료 분류가 아니라 fetch-failed면 성공).
+//   ⓑ 둘 다 만료 → 정조준 항목(진짜) 기준으로 기존 사유 분류 유지.
+//   ⓒ 정상 환경(첫 매치 생존) → 정조준 호출 자체가 없어야 함(동작·비용 불변).
+const ghostStore = (realAlive) => ({
+  '(first)': { accessToken: 'ghost', expiresAt: Date.now() - 1000, subscriptionType: 'max', hasRefreshToken: true, refreshTokenExpiresAt: null },
+  'testuser': { accessToken: 'real', expiresAt: realAlive ? Date.now() + 3_600_000 : Date.now() - 1000, subscriptionType: 'max', hasRefreshToken: true, refreshTokenExpiresAt: Date.now() + 86_400_000 }
+});
+const ghostOptions = (store, reads) => ({
+  readCredential: async (service, account) => {
+    reads.push(account ?? '(first)');
+    const c = store[account ?? '(first)'];
+    if (!c) throw Object.assign(new Error('item not found'), { code: 44 });
+    return c;
+  },
+  fallbackAccount: 'testuser',
+  cachePath: emptyCache,
+  endpoint: 'http://127.0.0.1:9/usage' // 막힌 포트 — 외부 네트워크 없이 즉시 실패
+});
+const reads1 = [];
+const ghostHit = await collectClaudeQuota(ghostOptions(ghostStore(true), reads1));
+assert.equal(ghostHit.staleReason, 'fetch-failed', '정조준으로 살아있는 토큰을 골라 조회까지 감(만료 분류 아님)');
+assert.deepEqual(reads1, ['(first)', 'testuser'], '첫 매치 → 사용자명 정조준 순서');
+const reads2 = [];
+const ghostDead = await collectClaudeQuota(ghostOptions(ghostStore(false), reads2));
+assert.equal(ghostDead.staleReason, 'token-expired', '둘 다 만료 + refresh 생존 → token-expired(진짜 항목 기준 분류)');
+const reads3 = [];
+const healthy = { '(first)': { accessToken: 'live', expiresAt: Date.now() + 3_600_000, subscriptionType: 'max', hasRefreshToken: true, refreshTokenExpiresAt: null } };
+await collectClaudeQuota(ghostOptions(healthy, reads3));
+assert.deepEqual(reads3, ['(first)'], '정상 환경은 정조준 호출 없음(비용·동작 불변)');
+
 // (3) 모델 전용(weekly_scoped) 사용률의 종료 대비 거동 — 2026-07-12 Fable 창 종료 대비.
 //   ⓐ scoped 0% → 숨김(정보가치 없음) ⓑ session/weekly_all 0% → 리셋 직후 정상이라 표시
 //   ⓒ API가 scoped 항목 자체를 안 내려주면 → 자동으로 없음

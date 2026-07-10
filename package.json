@@ -1,6 +1,6 @@
 {
   "name": "ai-charge-desk",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "description": "Local dashboard and SwiftBar summary for Claude Code and Codex usage state.",
