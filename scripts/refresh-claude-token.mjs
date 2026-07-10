@@ -27,7 +27,9 @@ if (!cli) {
     delete env.ANTHROPIC_API_KEY;
     delete env.ANTHROPIC_AUTH_TOKEN;
     // stdin을 바로 닫는다 — 안 닫으면 CLI가 파이프 입력을 3초 기다린다(crossval에서 확인된 함정).
-    const pending = execFileAsync(cli, ['-p', 'ok', '--model', 'haiku'], { timeout: 180_000, maxBuffer: 1024 * 1024, env });
+    // cwd를 repo로 고정한다 — SwiftBar는 버튼 스크립트를 cwd=/(루트)로 실행해, claude의 작업 폴더
+    // 훑기가 ~/Downloads 등 보호 폴더에 닿아 "SwiftBar가 폴더 접근" TCC 팝업을 띄운다(R30 검증에서 실측).
+    const pending = execFileAsync(cli, ['-p', 'ok', '--model', 'haiku'], { timeout: 180_000, maxBuffer: 1024 * 1024, env, cwd: CONFIG.projectRoot });
     pending.child.stdin?.end();
     await pending;
     result = { at: new Date().toISOString(), status: 'ok', detail: null };
