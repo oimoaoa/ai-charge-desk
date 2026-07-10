@@ -76,7 +76,7 @@ console.log(`${claudeHead}  ${codexHead}${headColor ? ` | color=${headColor}` : 
 
 console.log('---');
 // 버튼(누르는 것)은 전부 같은 아이콘(SF Symbol chevron.right.circle)으로 데이터 줄과 구분한다(제품 결정 2026-07-10).
-// 새로고침 버튼에 마지막 수집 시각을 병합 표기(별도 "새로고침: N 전" 줄 제거 — Hana 2026-07-10).
+// 새로고침 버튼에 마지막 수집 시각을 병합 표기(별도 "새로고침: N 전" 줄 제거 — 제품 결정 2026-07-10).
 // 새로고침은 래퍼 스크립트로: 수집이 "끝난 뒤" swiftbar:// URL로 다시 그리게 순서를 강제한다.
 // (refresh=true만 쓰면 SwiftBar가 명령 종료를 안 기다리고 즉시 다시 그려 옛 스냅샷이 보일 수 있음.)
 // node 경로는 process.execPath로 전달 — SwiftBar 최소 PATH에서 env node가 안 잡히는 함정 대비.
@@ -93,7 +93,7 @@ console.log('---');
 console.log(`프로젝트 폴더 | href=${pathToFileURL(root).href} sfimage=${BUTTON_ICON}`);
 console.log(`v${appVersion()} · AI Charge Desk | size=11 color=${SUBTLE}`);
 
-// 사용률 미니 막대(10칸) — 쓴 만큼 차오른다. ■/□는 같은 크기 글리프(▓/░는 메뉴에서 크기가 달라 보임 — Hana 2026-07-10).
+// 사용률 미니 막대(10칸) — 쓴 만큼 차오른다. ■/□는 같은 크기 글리프(▓/░는 메뉴에서 크기가 달라 보임 — 제품 결정 2026-07-10).
 function usageBar(percent) {
   if (!Number.isFinite(percent)) return '';
   const filled = Math.max(0, Math.min(10, Math.round(percent / 10)));
