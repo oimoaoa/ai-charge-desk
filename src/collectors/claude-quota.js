@@ -114,12 +114,12 @@ export function mapLimits(payload, warningThreshold, dangerThreshold) {
       label = '주간';
     } else if (lim.kind === 'weekly_scoped') {
       // 모델 전용 사용률(예: Fable)은 종료 예정 영역 — API가 항목을 빼면 자동으로 사라지고,
-      // 항목은 오는데 0%면 정보가치가 없어 표시하지 않는다(제품 결정 2026-07-09).
+      // 항목은 오는데 0%면 정보가치가 없어 표시하지 않는다(Hana 결정 2026-07-09).
       // 5시간·주간 전체의 0%는 리셋 직후의 정상 상태라 그대로 표시한다.
       const model = lim.scope?.model?.display_name;
       if (!model || !(lim.percent > 0)) continue;
       id = `claude-weekly-${String(model).toLowerCase()}`;
-      label = `주간 ${model}`;
+      label = String(model); // "주간 Fable" → "Fable" (제품 결정 2026-07-10 — 핵심만 간결하게)
     } else {
       continue;
     }

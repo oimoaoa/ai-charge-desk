@@ -76,10 +76,12 @@ console.log(`${claudeHead}  ${codexHead}${headColor ? ` | color=${headColor}` : 
 
 console.log('---');
 // 버튼(누르는 것)은 전부 같은 아이콘(SF Symbol chevron.right.circle)으로 데이터 줄과 구분한다(제품 결정 2026-07-10).
+// 새로고침 버튼에 마지막 수집 시각을 병합 표기(별도 "새로고침: N 전" 줄 제거 — Hana 2026-07-10).
 // 새로고침은 래퍼 스크립트로: 수집이 "끝난 뒤" swiftbar:// URL로 다시 그리게 순서를 강제한다.
 // (refresh=true만 쓰면 SwiftBar가 명령 종료를 안 기다리고 즉시 다시 그려 옛 스냅샷이 보일 수 있음.)
 // node 경로는 process.execPath로 전달 — SwiftBar 최소 PATH에서 env node가 안 잡히는 함정 대비.
-console.log(`데이터 새로고침 | bash=${shellArg(path.join(root, 'scripts', 'swiftbar-refresh.sh'))} param1=${shellArg(process.execPath)} terminal=false sfimage=${BUTTON_ICON}`);
+const refreshedAgo = snapshot?.app?.generatedAt ? agoLabel(snapshot.app.generatedAt) : '기록 없음';
+console.log(`데이터 새로고침 (${refreshedAgo}) | bash=${shellArg(path.join(root, 'scripts', 'swiftbar-refresh.sh'))} param1=${shellArg(process.execPath)} terminal=false sfimage=${BUTTON_ICON}`);
 // href는 공백·특수문자 경로에서도 열리게 file URL로 인코딩한다.
 console.log(`상세 대시보드 열기 | href=${pathToFileURL(dashboardFile).href} sfimage=${BUTTON_ICON}`);
 console.log('---');
@@ -88,17 +90,24 @@ console.log('---');
 printService('Codex', CODEX, codex, codexDataMeta, { staleHint: 'Codex 앱·CLI를 한 번 쓰면 갱신될 수 있어요' });
 printCredits(codex?.resetCredits);
 console.log('---');
-// "새로고침 시각"(스냅샷 생성 = generatedAt) — 데이터 나이가 아니라 언제 다시 계산했는지.
-const refreshedAgo = snapshot?.app?.generatedAt ? agoLabel(snapshot.app.generatedAt) : '기록 없음';
-console.log(`새로고침: ${refreshedAgo} | color=${SUBTLE}`);
 console.log(`프로젝트 폴더 | href=${pathToFileURL(root).href} sfimage=${BUTTON_ICON}`);
 console.log(`v${appVersion()} · AI Charge Desk | size=11 color=${SUBTLE}`);
 
-// 사용률 미니 막대(10칸) — 쓴 만큼 채운다. %가 없으면 빈 문자열(막대 생략).
+// 사용률 미니 막대(10칸) — 쓴 만큼 차오른다. ■/□는 같은 크기 글리프(▓/░는 메뉴에서 크기가 달라 보임 — Hana 2026-07-10).
 function usageBar(percent) {
   if (!Number.isFinite(percent)) return '';
   const filled = Math.max(0, Math.min(10, Math.round(percent / 10)));
-  return '▓'.repeat(filled) + '░'.repeat(10 - filled);
+  return '■'.repeat(filled) + '□'.repeat(10 - filled);
+}
+
+// 5시간 창(하루에 여러 번 리셋)은 날짜를 떼고 시간만 — 핵심만 간결하게(제품 결정 2026-07-10).
+// 주간 창은 날짜 유지. "곧 리셋"·"사용 시작 전" 같은 비날짜 라벨은 그대로 통과.
+function shortResetLabel(metric) {
+  const label = metric.resetLabel ?? '';
+  if (metric.id === 'claude-session' || metric.id === 'codex-primary') {
+    return label.replace(/^(\d{4}-)?\d{2}-\d{2}\([^)]+\)\s*/, '');
+  }
+  return label;
 }
 
 // 버전은 package.json 한 곳에서(하드코딩 금지).
@@ -182,9 +191,9 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
     console.log(`  사용률 미표시${hint ? ` — ${hint}` : ''} | color=${SUBTLE}`);
   } else {
     for (const metric of service.metrics) {
-      // 막대를 줄 맨 앞에 — 라벨 길이와 무관하게 막대들이 세로로 정렬된다(쓴 % 기준, R8).
+      // "라벨 막대 N% 사용 · 리셋" — 라벨 먼저(확정 레이아웃 2026-07-10), 막대는 쓴 % 기준(R8).
       const gauge = usageBar(metric.usedPercent);
-      console.log(`  ${gauge ? `${gauge} ` : ''}${metric.label}: ${metric.usedPercent}% 사용 · ${metric.resetLabel} | color=${metricColor(metric)}`);
+      console.log(`  ${metric.label} ${gauge ? `${gauge} ` : ''}${metric.usedPercent}% 사용 · ${shortResetLabel(metric)} | color=${metricColor(metric)}`);
     }
   }
   // 옛 데이터 안내: 나이 + 원인 + 해법(갱신 버튼·폴백) — R29·R30.
