@@ -4,6 +4,8 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { CONFIG } from '../src/config.js';
+import { collectClaudeQuota } from '../src/collectors/claude-quota.js';
+import { pollUntil } from '../src/lib/retry.js';
 
 const execFileAsync = promisify(execFile);
 const resultPath = path.join(CONFIG.dataDir, 'token-refresh-result.json');
@@ -44,6 +46,22 @@ if (!cli) {
 await fs.promises.mkdir(CONFIG.dataDir, { recursive: true });
 await fs.promises.writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`);
 console.log(`token refresh: ${result.status}`);
+
+// 갱신 트리거가 성공했으면, 실시간 사용률이 실제로 살아날 때까지 짧게 재확인한다
+// (대기 최대 ~4초 = 최대 5회 × 0.8초 + 매 시도의 실시간 조회 지연). 이 스크립트 뒤에
+// (swiftbar-refresh 래퍼가) build-snapshot을 돌리므로, 여기서 fresh를 확인해 두면 재수집이
+// 한 번에 성공해 드롭다운에 바로 반영된다 — 예전엔 한 박자 늦어 수동 새로고침이 또 필요했다.
+// 끝까지 안 살아나면(로그인 풀림 등) 가짜 성공을 만들지 않고 그대로 둔다(정직한 stale — No Silent Fallback).
+// poll은 "빌드 전에 데워두기"용 보조 단계다 — 예상 못한 조회 오류가 나도 이미 성공한 토큰 갱신과
+// 뒤따르는 build-snapshot을 막지 않게 best-effort(try-catch)로 감싼다(교차검증 지적 2026-07-11).
+if (result.status === 'ok') {
+  try {
+    const poll = await pollUntil(() => collectClaudeQuota(), (q) => q?.fresh === true);
+    console.log(`quota poll: ${poll.ready ? 'fresh' : 'still-stale'} after ${poll.tries} tries`);
+  } catch (error) {
+    console.log(`quota poll: error (${String(error?.message ?? error).slice(0, 80)})`);
+  }
+}
 
 // claude CLI 탐색 — collectors/claude.js findExecutable과 같은 원리(SwiftBar 최소 PATH 대비).
 async function findClaude() {

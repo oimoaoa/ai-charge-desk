@@ -1,6 +1,6 @@
 {
   "name": "ai-charge-desk",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "type": "module",
   "description": "Local dashboard and SwiftBar summary for Claude Code and Codex usage state.",
@@ -8,7 +8,7 @@
     "audit": "node scripts/audit-data.mjs",
     "snapshot": "node scripts/build-snapshot.mjs",
     "start": "node scripts/serve.mjs",
-    "test": "node tests/progress.test.mjs && node tests/codex-collector.test.mjs && node tests/claude-quota.test.mjs"
+    "test": "node tests/progress.test.mjs && node tests/codex-collector.test.mjs && node tests/claude-quota.test.mjs && node tests/retry.test.mjs && node tests/node-path.test.mjs"
   },
   "dependencies": {
     "ccusage": "^20.0.14"

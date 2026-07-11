@@ -15,6 +15,7 @@ import {
   kstMonthCycleStart,
   kstWeekStartMonday
 } from '../lib/time.js';
+import { withNodeDirOnPath } from '../lib/node-path.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -219,7 +220,7 @@ async function collectCodexCostFacts(ccusagePath) {
     const { stdout } = await execFileAsync(
       ccusagePath,
       ['codex', 'daily', '--breakdown', '--json', '--since', kstDateKey(since).replaceAll('-', '')],
-      { timeout: 20000, maxBuffer: 10 * 1024 * 1024 }
+      { timeout: 20000, maxBuffer: 10 * 1024 * 1024, env: withNodeDirOnPath() }
     );
     const daily = JSON.parse(stdout).daily ?? [];
 

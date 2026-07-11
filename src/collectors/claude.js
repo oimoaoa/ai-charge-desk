@@ -7,6 +7,7 @@ import { makeUsageMetric } from '../lib/progress.js';
 import { formatUsd } from '../lib/money.js';
 import { collectClaudeQuota } from './claude-quota.js';
 import { formatResetKstFromIso, formatKstDateRange, kstMonthCycleStart, kstWeekStartMonday } from '../lib/time.js';
+import { withNodeDirOnPath } from '../lib/node-path.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -90,7 +91,7 @@ async function collectCost(ccusagePath) {
     const { stdout } = await execFileAsync(
       ccusagePath,
       ['claude', 'daily', '--breakdown', '--json', '--since', kstDateKey(since).replaceAll('-', '')],
-      { timeout: 20000, maxBuffer: 10 * 1024 * 1024 }
+      { timeout: 20000, maxBuffer: 10 * 1024 * 1024, env: withNodeDirOnPath() }
     );
     daily = JSON.parse(stdout).daily ?? [];
   } catch (error) {
