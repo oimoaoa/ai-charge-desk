@@ -69,15 +69,17 @@ const codex = snapshot?.services?.codex;
 const claudeMetrics = claude?.metrics ?? [];
 const codexMetrics = codex?.metrics ?? [];
 
-// 상태바: 각 서비스의 5시간(현재 창) 사용률. 하트 색이 서비스 구분(핑크=Claude·블루=Codex),
-// 구분점 없이 여백만(디자인 결정: 시안 B). 색은 전체에서 가장 위험한 등급(이모지는 원색 유지).
-// 옛 데이터면 % 뒤 ⚠️ — 카운트다운이 흘러가 살아 보여도 값 자체가 옛것임을 상태바에서 바로 알 수 있게(R29).
+// 상태바: 서비스당 한 덩어리 `하트⚠️%(원인 %)` — 숫자는 5시간 창, 서비스 사이 두 칸(제품 결정 2026-07-12).
+// 글자색은 미지정(시스템 자동 — 라이트=검정/다크=흰색). 색 정보는 하트가 전담:
+//   정상 🩷(Claude)/🩵(Codex) → 그 서비스 지표 중 최악 70%+ 🧡 → 90%+ ❤️. 서비스 구분은 고정 순서(왼쪽 Claude).
+// 괄호는 90%+ 원인이 상태바에 안 보이는 지표(주간·Fable)일 때만 원인 이름을 데리고 등장 —
+//   "왜 이 색이지?" 수수께끼를 구조적으로 제거(색·경고의 원인이 항상 화면에 있게). 상세 규칙: README "메뉴바 요약" 참고.
+// 옛 데이터면 하트 바로 뒤 ⚠️ — 카운트다운이 흘러가 살아 보여도 값 자체가 옛것임을 바로 알 수 있게(R29).
 const claudeDataMeta = snapshot?.app?.data?.claude;
 const codexDataMeta = snapshot?.app?.data?.codex;
-const claudeHead = headPercent(byId(claudeMetrics, 'claude-session')?.usedPercent, '🩷', isStaleMeta(claudeDataMeta));
-const codexHead = headPercent(byId(codexMetrics, 'codex-primary')?.usedPercent, '🩵', isStaleMeta(codexDataMeta));
-const headColor = tierColor(worstTier([...claudeMetrics, ...codexMetrics]));
-console.log(`${claudeHead}  ${codexHead}${headColor ? ` | color=${headColor}` : ''}`);
+const claudeHead = serviceHead(claudeMetrics, 'claude-session', '🩷', isStaleMeta(claudeDataMeta));
+const codexHead = serviceHead(codexMetrics, 'codex-primary', '🩵', isStaleMeta(codexDataMeta));
+console.log(`${claudeHead}  ${codexHead}`);
 
 console.log('---');
 // 버튼(누르는 것)은 전부 같은 아이콘(SF Symbol chevron.right.circle)으로 데이터 줄과 구분한다(제품 결정 2026-07-10).
@@ -169,14 +171,25 @@ function worstTier(metrics) {
   return rank === 3 ? 'danger' : rank === 2 ? 'warning' : rank === 1 ? 'normal' : null;
 }
 
-function tierColor(tier) {
-  if (tier === 'danger') return DANGER;
-  if (tier === 'warning') return WARN;
-  return null; // 정상/미상: 색 지정 안 함(메뉴바 자동색)
-}
-
-function headPercent(value, prefix, stale = false) {
-  return Number.isFinite(value) ? `${prefix} ${Math.round(value)}%${stale ? '⚠️' : ''}` : `${prefix} --`;
+// 상태바 서비스 덩어리 `하트⚠️%(원인 %)` — 붙여쓰기 한 묶음, 괄호 안 라벨·값 사이만 공백 하나
+// ("Fable95%"처럼 영문 라벨과 숫자가 붙어 오독되는 것 방지). tier는 수집기가 계산한 값(임계 70/90
+// config 단일 출처)을 그대로 신뢰 — 여기서 임계값을 재계산하지 않는다(이중 정의 방지).
+function serviceHead(metrics, primaryId, normalHeart, stale) {
+  const primaryPercent = byId(metrics, primaryId)?.usedPercent;
+  // %는 반올림이 아니라 내림(floor) — tier는 원값 기준(89.6=warning)인데 반올림하면 "🧡90%"처럼
+  // 표시 숫자와 하트 색 규칙(90%+=❤️)이 어긋나는 창(x.5~x.9)이 생긴다. 내림은 임계(70/90)와 항상 정합.
+  const percentText = Number.isFinite(primaryPercent) ? `${Math.floor(primaryPercent)}%` : '--';
+  const tier = worstTier(metrics);
+  const heart = tier === 'danger' ? '❤️' : tier === 'warning' ? '🧡' : normalHeart;
+  // 괄호: 위험(90%+)의 원인이 상태바에 안 보이는 지표일 때만, 여러 개면 최고 % 하나만(덕지덕지 방지).
+  const hiddenDanger = (metrics ?? [])
+    .filter((metric) => metric.id !== primaryId && metric.tier === 'danger' && Number.isFinite(metric.usedPercent))
+    .sort((a, b) => b.usedPercent - a.usedPercent)[0] ?? null;
+  // 라벨은 API display_name이 원천이라 첫 줄(상태바)에서 SwiftBar 문법을 깨는 |·개행을 제거한다.
+  const culprit = hiddenDanger
+    ? `(${String(hiddenDanger.label ?? '').replace(/[|\r\n]+/g, ' ').trim()} ${Math.floor(hiddenDanger.usedPercent)}%)`
+    : '';
+  return `${heart}${stale ? '⚠️' : ''}${percentText}${culprit}`;
 }
 
 // "옛 데이터" 판정: 측정 시각이 있고, (실시간 && 10분 미만)이 아니면 stale.
