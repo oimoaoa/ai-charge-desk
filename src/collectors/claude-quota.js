@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 const KEYCHAIN_SERVICE = 'Claude Code-credentials';
 
 // Claude 사용률(%)을 실시간 usage API로 확보한다.
-// 안전 원칙(교차검증 2026-07-09 검증):
+// 안전 원칙:
 //  - 읽기 전용. access token을 refresh하지 않고 write하지 않는다(refresh는 Claude Code 본체에만 맡김 → 로그인 안 깨짐).
 //  - 토큰 값은 로그·캐시·스냅샷 어디에도 출력/저장하지 않는다. 응답의 PII(email·user_id)도 저장하지 않는다.
 //  - 필드가 없거나 조회 실패면 가짜 %를 만들지 않고 정직히 미표시(unavailable) 또는 마지막 성공값(stale)을 표시한다.

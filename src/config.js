@@ -30,7 +30,7 @@ export const CONFIG = {
   claude: {
     // 비용/토큰은 ccusage로, quota(%)는 아래 oauth usage 엔드포인트(read-only)로 확보한다.
     // 미사용 필드(token refresh endpoint·디스크 credentials 경로 등)는 두지 않는다 —
-    // "refresh 안 함" 설계를 코드만 봐도 믿을 수 있게(교차검증 지적).
+    // "refresh 안 함" 설계를 코드만 봐도 믿을 수 있게.
     // 사용률(%) 마지막 성공값 캐시(토큰·PII 없이 %·리셋시각만). 실시간 조회 실패 시 stale로 표시.
     quotaCachePath: path.join(dataDir, 'claude-quota-cache.json'),
     usageEndpoint: 'https://api.anthropic.com/api/oauth/usage',

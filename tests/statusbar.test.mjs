@@ -154,7 +154,34 @@ const cases = [
   ['부분 결손 — 5시간 없음 + 주간 위험이면 정직하게 --(주간 %) (가짜값 금지)', {
     claude: [metric('claude-weekly', '주간', 93)],
     codex: CODEX_OK
-  }, '❤️--(주간 93%)  🩵15%']
+  }, '❤️--(주간 93%)  🩵15%'],
+
+  // --- Codex 창 소멸: 5시간이 정책적으로 사라지면 주간이 대표로 폴백(제품 결정 2026-07-13) ---
+  ['Codex 5시간 소멸 — 주간이 대표로 폴백(정상)', {
+    claude: [metric('claude-session', '5시간', 54)],
+    codex: [metric('codex-secondary', '주간', 2)]
+  }, '🩷54%  🩵2%'],
+
+  ['Codex 5시간 소멸 — 주간이 대표인데 90%+면 그 자리에서 ❤️(괄호 없음, 대표 자신)', {
+    claude: [metric('claude-session', '5시간', 54)],
+    codex: [metric('codex-secondary', '주간', 93)]
+  }, '🩷54%  ❤️93%'],
+
+  ['Codex 5시간 소멸 — 주간 대표 70~89%면 🧡', {
+    claude: [metric('claude-session', '5시간', 54)],
+    codex: [metric('codex-secondary', '주간', 78)]
+  }, '🩷54%  🧡78%'],
+
+  ['Codex 주간 소멸 — 5시간만 남으면 5시간이 대표(대칭 동작)', {
+    claude: [metric('claude-session', '5시간', 54)],
+    codex: [metric('codex-primary', '5시간', 15)]
+  }, '🩷54%  🩵15%'],
+
+  // 같은 id가 중복돼도 대표 아닌 둘째 창의 위험이 괄호로 노출된다(객체 참조 비교 — phantom success 방지)
+  ['id 중복 방어 — 대표 아닌 둘째 danger가 괄호로 노출', {
+    claude: [metric('claude-session', '5시간', 54)],
+    codex: [metric('codex-secondary', '주간', 15), metric('codex-secondary', '주간', 93)]
+  }, '🩷54%  ❤️15%(주간 93%)']
 ];
 
 let failed = 0;

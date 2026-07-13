@@ -65,13 +65,49 @@ export async function collectCodexUsage(options = {}) {
   return collectFromSessions(sessionsDir, ccusagePath, warningThreshold, dangerThreshold, audit);
 }
 
-function mapApiUsage(payload, warningThreshold, dangerThreshold) {
+// Codex는 창 종류 이름표(kind)를 안 주므로, API 슬롯 위치가 아니라 창 "길이"(window_minutes)로 5시간/주간을 가른다.
+// (위치로 가정하면 5시간이 사라졌을 때 주간이 primary 슬롯으로 올라와 "주간에 5시간 라벨"이 붙는다 — 실측 2026-07-13.
+//  창 길이는 API·세션 파일 둘 다 항상 주므로, 길이로 판단하면 슬롯이 뒤바뀌거나 하나가 없어져도 라벨이 안 어긋난다.)
+const SLOT_PRIMARY = { id: 'codex-primary', label: '5시간', showWindow: false, slot: '5h' };
+const SLOT_SECONDARY = { id: 'codex-secondary', label: '주간', showWindow: true, slot: 'weekly' };
+// 표시·상태바 대표 선택 순서: 5시간(짧은 창) 먼저, 주간 나중 — 슬롯이 뒤바뀌어도 종류 순서를 유지.
+const WINDOW_ORDER = { 'codex-primary': 0, 'codex-secondary': 1 };
+
+// Codex 창 길이 → 종류. 알려진 두 창만 확정 라벨: 5시간(실측 300분)·주간(실측 10080분).
+//  - ≤360분(6시간): 5시간류 단기창(300분을 여유있게 포함하되 주간과 확실히 가르는 경계).
+//  - 360~20160분(~2주): 주간류.
+//  - 그 밖(길이 미상 또는 20160분 초과의 미지 장기창): null → 호출부가 그 창을 스킵한다.
+// 슬롯 위치(primary/secondary)로 5시간/주간을 "추정"하지 않는다 — 그 추정이 이번 버그의 원인이라,
+// 모르면 정직히 미표시한다. 현재 Codex는 두 창뿐이라 이분법으로 충분(YAGNI) —
+// 새 길이의 창이 실제 등장하면 그때 라벨을 추가한다(DECISIONS 기록).
+function classifyCodexWindow(windowMinutes) {
+  if (!Number.isFinite(windowMinutes)) return null;
+  if (windowMinutes <= 360) return SLOT_PRIMARY;
+  if (windowMinutes <= 20160) return SLOT_SECONDARY;
+  return null;
+}
+
+// 정규화된 window({used_percent, resets_at, window_minutes}) 하나를 길이로 분류해 metric 배열로 만든다.
+// 창이 없거나·사용률이 없거나·창 길이로 종류를 못 정하면 빈 배열 → 그 창은 표시에서 자연히 사라진다
+// (모델 소멸과 같은 원리, 제품 설계). 길이 미상을 슬롯 위치로 추정하지 않는다(구버그 재도입 방지).
+function codexWindowMetric(windowData, sourceBase, warningThreshold, dangerThreshold) {
+  if (!windowData || !Number.isFinite(windowData.used_percent)) return [];
+  const kind = classifyCodexWindow(windowData.window_minutes);
+  if (!kind) return [];
+  return windowMetric(kind.id, windowData, kind.label, warningThreshold, dangerThreshold, kind.showWindow, `${sourceBase}.${kind.slot}`);
+}
+
+function sortByWindow(metrics) {
+  return metrics.sort((a, b) => (WINDOW_ORDER[a.id] ?? 9) - (WINDOW_ORDER[b.id] ?? 9));
+}
+
+// (export는 테스트용 — 창 길이 분류·소멸 거동을 유닛으로 고정. 실제 버그가 이 API 경로에서 났다.)
+export function mapApiUsage(payload, warningThreshold, dangerThreshold) {
   const rl = payload?.rate_limit ?? {};
-  const primary = normalizeApiWindow(rl.primary_window);
-  const secondary = normalizeApiWindow(rl.secondary_window);
-  const metrics = [];
-  metrics.push(...windowMetric('codex-primary', primary, '5시간', warningThreshold, dangerThreshold, false, 'codex.usage.primary'));
-  metrics.push(...windowMetric('codex-secondary', secondary, '주간', warningThreshold, dangerThreshold, true, 'codex.usage.secondary'));
+  const metrics = sortByWindow([
+    ...codexWindowMetric(normalizeApiWindow(rl.primary_window), 'codex.usage', warningThreshold, dangerThreshold),
+    ...codexWindowMetric(normalizeApiWindow(rl.secondary_window), 'codex.usage', warningThreshold, dangerThreshold)
+  ]);
   const availableCount = payload?.rate_limit_reset_credits?.available_count;
   return { metrics, availableCount: Number.isFinite(availableCount) ? availableCount : null };
 }
@@ -156,9 +192,11 @@ async function collectFromSessions(sessionsDir, ccusagePath, warningThreshold, d
     };
   }
 
-  const metrics = [];
-  metrics.push(...windowMetric('codex-primary', latest.rateLimits.primary, '5시간', warningThreshold, dangerThreshold, false, 'codex.session.primary'));
-  metrics.push(...windowMetric('codex-secondary', latest.rateLimits.secondary, '주간', warningThreshold, dangerThreshold, true, 'codex.session.secondary'));
+  // 세션 파일의 rate_limits.primary/secondary도 window_minutes를 담으므로 API와 같은 길이 기반 분류를 쓴다.
+  const metrics = sortByWindow([
+    ...codexWindowMetric(latest.rateLimits.primary, 'codex.session', warningThreshold, dangerThreshold),
+    ...codexWindowMetric(latest.rateLimits.secondary, 'codex.session', warningThreshold, dangerThreshold)
+  ]);
 
   const costFacts = ccusagePath ? await collectCodexCostFacts(ccusagePath) : { items: [] };
   if (costFacts.failed) {

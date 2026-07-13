@@ -53,7 +53,7 @@ console.log(`token refresh: ${result.status}`);
 // 한 번에 성공해 드롭다운에 바로 반영된다 — 예전엔 한 박자 늦어 수동 새로고침이 또 필요했다.
 // 끝까지 안 살아나면(로그인 풀림 등) 가짜 성공을 만들지 않고 그대로 둔다(정직한 stale — No Silent Fallback).
 // poll은 "빌드 전에 데워두기"용 보조 단계다 — 예상 못한 조회 오류가 나도 이미 성공한 토큰 갱신과
-// 뒤따르는 build-snapshot을 막지 않게 best-effort(try-catch)로 감싼다(교차검증 지적 2026-07-11).
+// 뒤따르는 build-snapshot을 막지 않게 best-effort(try-catch)로 감싼다.
 if (result.status === 'ok') {
   try {
     const poll = await pollUntil(() => collectClaudeQuota(), (q) => q?.fresh === true);

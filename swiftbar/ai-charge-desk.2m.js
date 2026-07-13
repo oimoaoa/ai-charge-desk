@@ -77,8 +77,9 @@ const codexMetrics = codex?.metrics ?? [];
 // 옛 데이터면 하트 바로 뒤 ⚠️ — 카운트다운이 흘러가 살아 보여도 값 자체가 옛것임을 바로 알 수 있게(R29).
 const claudeDataMeta = snapshot?.app?.data?.claude;
 const codexDataMeta = snapshot?.app?.data?.codex;
-const claudeHead = serviceHead(claudeMetrics, 'claude-session', '🩷', isStaleMeta(claudeDataMeta));
-const codexHead = serviceHead(codexMetrics, 'codex-primary', '🩵', isStaleMeta(codexDataMeta));
+const claudeHead = serviceHead(claudeMetrics, ['claude-session'], '🩷', isStaleMeta(claudeDataMeta));
+// Codex는 5시간→주간 폴백: 5시간 창이 사라지면(제공사 프로모션 등) 주간을 대표 숫자로 자동 승격.
+const codexHead = serviceHead(codexMetrics, ['codex-primary', 'codex-secondary'], '🩵', isStaleMeta(codexDataMeta));
 console.log(`${claudeHead}  ${codexHead}`);
 
 console.log('---');
@@ -109,6 +110,9 @@ function usageBar(percent) {
 
 // 5시간 창(하루에 여러 번 리셋)은 날짜를 떼고 시간만 — 핵심만 간결하게(제품 결정 2026-07-10).
 // 주간 창은 날짜 유지. "곧 리셋"·"사용 시작 전" 같은 비날짜 라벨은 그대로 통과.
+// id가 창 종류에 고정돼 있어(codex-primary = 5시간 창, codex는 길이로 분류) 이 조건이 곧 "5시간 창일 때"와
+// 동치다 — 길이로 종류를 못 정하는 창은 collector가 아예 metric을 안 만들어 스킵하므로, 주간이
+// codex-primary id를 다는 경로가 없다(구 버그 원인 제거). 따라서 주간은 항상 날짜가 유지된다.
 function shortResetLabel(metric) {
   const label = metric.resetLabel ?? '';
   if (metric.id === 'claude-session' || metric.id === 'codex-primary') {
@@ -174,16 +178,22 @@ function worstTier(metrics) {
 // 상태바 서비스 덩어리 `하트⚠️%(원인 %)` — 붙여쓰기 한 묶음, 괄호 안 라벨·값 사이만 공백 하나
 // ("Fable95%"처럼 영문 라벨과 숫자가 붙어 오독되는 것 방지). tier는 수집기가 계산한 값(임계 70/90
 // config 단일 출처)을 그대로 신뢰 — 여기서 임계값을 재계산하지 않는다(이중 정의 방지).
-function serviceHead(metrics, primaryId, normalHeart, stale) {
-  const primaryPercent = byId(metrics, primaryId)?.usedPercent;
+function serviceHead(metrics, primaryIds, normalHeart, stale) {
+  // 대표 창: 우선순위(primaryIds) 순서대로 "첫 번째로 존재하는" 지표. Codex는 5시간→주간 폴백 —
+  // 5시간 창이 정책적으로 사라지면(제공사 프로모션 등) 주간이 자동으로 대표가 된다(제품 결정 2026-07-13).
+  // Claude는 ['claude-session']만 — 5시간 부재는 소멸이 아니라 로그인 결손이라 --로 두는 게 정직(폴백 안 함).
+  const primary = primaryIds.map((id) => byId(metrics, id)).find(Boolean) ?? null;
   // %는 반올림이 아니라 내림(floor) — tier는 원값 기준(89.6=warning)인데 반올림하면 "🧡90%"처럼
   // 표시 숫자와 하트 색 규칙(90%+=❤️)이 어긋나는 창(x.5~x.9)이 생긴다. 내림은 임계(70/90)와 항상 정합.
-  const percentText = Number.isFinite(primaryPercent) ? `${Math.floor(primaryPercent)}%` : '--';
+  const percentText = Number.isFinite(primary?.usedPercent) ? `${Math.floor(primary.usedPercent)}%` : '--';
   const tier = worstTier(metrics);
   const heart = tier === 'danger' ? '❤️' : tier === 'warning' ? '🧡' : normalHeart;
-  // 괄호: 위험(90%+)의 원인이 상태바에 안 보이는 지표일 때만, 여러 개면 최고 % 하나만(덕지덕지 방지).
+  // 괄호: 위험(90%+)의 원인이 "대표로 안 보이는" 지표일 때만, 여러 개면 최고 % 하나만(덕지덕지 방지).
+  // 대표로 쓴 그 지표 "객체"만 제외(id 문자열이 아니라 참조 비교) — 만에 하나 같은 id가 중복돼도
+  // 둘째 창의 위험이 괄호에서 누락돼 조용히 묻히지 않게. 대표가 없으면(primary=null)
+  // 모든 danger가 괄호 대상 — `--(주간 93%)`.
   const hiddenDanger = (metrics ?? [])
-    .filter((metric) => metric.id !== primaryId && metric.tier === 'danger' && Number.isFinite(metric.usedPercent))
+    .filter((metric) => metric !== primary && metric.tier === 'danger' && Number.isFinite(metric.usedPercent))
     .sort((a, b) => b.usedPercent - a.usedPercent)[0] ?? null;
   // 라벨은 API display_name이 원천이라 첫 줄(상태바)에서 SwiftBar 문법을 깨는 |·개행을 제거한다.
   const culprit = hiddenDanger

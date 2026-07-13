@@ -39,4 +39,4 @@ export async function readJsonlObjects(filePath, onObject) {
   return { malformed };
 }
 
-// (제거됨) Phase 1의 키패스 탐색 유틸(collectKeyPaths 등) — 호출부가 사라진 죽은 코드라 삭제(교차검증 지적).
+// (제거됨) Phase 1의 키패스 탐색 유틸(collectKeyPaths 등) — 호출부가 사라진 죽은 코드라 삭제.
