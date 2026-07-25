@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { makeUsageMetric } from '../src/lib/progress.js';
 
 // 상태바 표시 정책(v0.1.8, 표시정책.md §2) 전 케이스 매트릭스.
 // 재구현 검증이 아니라 "실제 플러그인 파일"을 fixture 스냅샷으로 실행해 첫 줄(상태바)을 통째로 비교한다
@@ -20,34 +21,40 @@ await fs.promises.mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
 await fs.promises.writeFile(path.join(fixtureRoot, 'scripts', 'build-snapshot.mjs'), 'process.exit(0);\n');
 await fs.promises.writeFile(path.join(fixtureRoot, 'package.json'), JSON.stringify({ version: '0.0.0-test' }));
 
-// 수집기와 같은 규칙(70/90)으로 tier를 채운 지표 — 플러그인은 precomputed tier를 신뢰하므로 fixture도 그 계약대로.
+// production과 같은 makeUsageMetric 경로로 tier를 만든다.
 function metric(id, label, usedPercent) {
-  const tier = usedPercent === null ? 'unavailable'
-    : usedPercent >= 90 ? 'danger' : usedPercent >= 70 ? 'warning' : 'normal';
-  return { id, label, usedPercent, tier, resetLabel: '07-12(일) 17:00' };
+  return makeUsageMetric({
+    id, label, usedPercent,
+    resetLabel: '07-12(일) 17:00',
+    source: 'test'
+  });
 }
 const now = () => new Date().toISOString();
 const twoHoursAgo = () => new Date(Date.now() - 2 * 3600_000).toISOString();
 
-function snapshotWith({ claude = [], codex = [], claudeMeta, codexMeta } = {}) {
+function snapshotWith({
+  claude = [], codex = [],
+  claudeFacts = [], codexFacts = [], resetCredits,
+  claudeMeta, codexMeta, generatedAt
+} = {}) {
   const freshMeta = { measuredAt: now(), fresh: true, staleReason: null };
   return {
     app: {
-      generatedAt: now(), // 신선 — 플러그인의 백그라운드 자동수집(spawn)이 절대 안 돌게
+      generatedAt: generatedAt ?? now(), // 기본은 신선 — 자동수집이 돌지 않게
       data: { claude: claudeMeta ?? freshMeta, codex: codexMeta ?? freshMeta },
       exchange: { rate: 1500 }
     },
     services: {
-      claude: { metrics: claude, facts: [] },
-      codex: { metrics: codex, facts: [] }
+      claude: { metrics: claude, facts: claudeFacts },
+      codex: { metrics: codex, facts: codexFacts, resetCredits }
     }
   };
 }
 
-function renderHead(snapshot) {
+function renderHead(snapshot, extraEnv = {}) {
   fs.writeFileSync(path.join(fixtureRoot, 'data', 'snapshot.json'), JSON.stringify(snapshot));
   const out = execFileSync(process.execPath, [pluginPath], {
-    env: { ...process.env, AI_CHARGE_DESK_DIR: fixtureRoot },
+    env: { ...process.env, AI_CHARGE_DESK_DIR: fixtureRoot, ...extraEnv },
     encoding: 'utf8'
   });
   return { head: out.split('\n')[0], full: out };
@@ -210,6 +217,66 @@ assert.ok(full.includes('**Codex**'), '드롭다운 Codex 헤더 유지');
 assert.ok(full.includes('데이터 새로고침'), '새로고침 버튼 유지');
 assert.ok(full.includes('상세 대시보드 열기'), '대시보드 버튼 유지');
 console.log('✅ 드롭다운 뼈대 회귀(헤더·버튼) 유지');
+
+// 공통 정보 행 enabled rendering + DETAIL 위계 + production tier 경계.
+{
+  const costFacts = [
+    { group: 'monthly', value: '$10.0', rawCost: 10 },
+    { group: 'weekly', value: '$3.0', rawCost: 3 },
+    { group: 'today', value: '$1.0', rawCost: 1 }
+  ];
+  const { full } = renderHead(snapshotWith({
+    claude: [
+      metric('claude-session', '69 경계', 69),
+      metric('claude-weekly', '70 경계', 70),
+      metric('claude-weekly-fable', '89.9 경계', 89.9),
+      metric('claude-danger', '90 경계', 90)
+    ],
+    codex: [metric('codex-primary', '5시간', 15)],
+    claudeFacts: costFacts,
+    codexFacts: costFacts,
+    resetCredits: {
+      status: 'ok',
+      availableCount: 2,
+      credits: [
+        { status: 'available', expiresAtKst: '2026-08-01(토) 05:12' },
+        { status: 'available', expiresAtKst: '2026-08-13(목) 02:40' }
+      ]
+    }
+  }));
+
+  assert.match(full, /\*\*Claude Code\*\* \| md=true color=#b42363,#ff5f9c refresh=true/, 'Claude 헤더 enabled light/dark');
+  assert.match(full, /\*\*Codex\*\* \| md=true color=#0067b1,#3fa9ff refresh=true/, 'Codex 헤더 enabled light/dark');
+  assert.match(full, /69 경계 .*69% 사용.*color=#1c2330,#eef1f6 refresh=true/, '69 normal production tier');
+  assert.match(full, /70 경계 .*70% 사용.*color=#9c5a00,#f0a12b refresh=true/, '70 warning production tier');
+  assert.match(full, /89\.9 경계 .*89\.9% 사용.*color=#9c5a00,#f0a12b refresh=true/, '89.9 warning production tier');
+  assert.match(full, /90 경계 .*90% 사용.*color=#c5221f,#ff665e refresh=true/, '90 danger production tier');
+  assert.equal((full.match(/↳ 이번 (?:달|주)|↳ 오늘/g) ?? []).length, 6, '양 서비스 비용 3종 전부');
+  assert.equal((full.match(/color=#4b5563,#aab4c4 refresh=true/g) ?? []).length, 8, '비용 6+이용권 날짜 2 DETAIL enabled');
+  assert.match(full, /초기화 이용권: 2개 남음 \| color=#0067b1,#3fa9ff refresh=true/, '이용권 개수 CODEX enabled');
+  assert.match(full, /↳ 2026-08-01\(토\) 05:12까지 \| color=#4b5563,#aab4c4 refresh=true/, '첫 만료일 DETAIL enabled');
+  assert.match(full, /↳ 2026-08-13\(목\) 02:40까지 \| color=#4b5563,#aab4c4 refresh=true/, '둘째 만료일 DETAIL enabled');
+  assert.match(full, /v0\.0\.0-test · AI Charge Desk \| size=11 color=#5b6470,#aab4c4\n/, 'SUBTLE 버전 actionless 유지');
+  console.log('✅ 드롭다운 색·위계·enabled 범위');
+}
+
+// MenuAction은 stale snapshot에서도 표시만 갱신하고 자동수집 lock을 만들지 않는다.
+{
+  const lockPath = path.join(fixtureRoot, 'data', '.refresh.lock');
+  fs.rmSync(lockPath, { force: true });
+  const staleSnapshot = snapshotWith({
+    claude: [metric('claude-session', '5시간', 70)],
+    codex: CODEX_OK,
+    generatedAt: twoHoursAgo()
+  });
+  renderHead(staleSnapshot, { SWIFTBAR_PLUGIN_REFRESH_REASON: 'MenuAction' });
+  assert.equal(fs.existsSync(lockPath), false, 'MenuAction은 자동수집 lock을 만들지 않음');
+
+  renderHead(staleSnapshot, { SWIFTBAR_PLUGIN_REFRESH_REASON: 'Schedule' });
+  assert.equal(fs.existsSync(lockPath), true, 'Schedule은 기존 자동수집 freshness gate 유지');
+  fs.rmSync(lockPath, { force: true });
+  console.log('✅ MenuAction display-only / Schedule 자동수집 유지');
+}
 
 // 스냅샷 파손(JSON 깨짐) — 크래시 없이 양쪽 `--`로 정직 표시(가짜값 금지).
 {

@@ -25,12 +25,13 @@ if (!fs.existsSync(buildScript)) {
 }
 
 // 색 — SwiftBar는 `color=라이트색,다크색`으로 두 모드를 지원한다. 드롭다운이 밝든 어둡든 진하게 보이게.
-const WARN = '#f0a12b';           // 70%+ 주의(양쪽에서 잘 보임)
-const DANGER = '#ef3127';         // 90%+ 위험
+const WARN = '#9c5a00,#f0a12b';   // 70%+ 주의(라이트,다크)
+const DANGER = '#c5221f,#ff665e'; // 90%+ 위험(라이트,다크)
 const INK = '#1c2330,#eef1f6';    // 본문(사용률·라벨) — 진하게
-const SUBTLE = '#5b6470,#aab4c4'; // 보조(비용·데이터 나이) — 이전보다 진함
-const CLAUDE = '#d6407a,#ff5f9c'; // 서비스 헤더색(핑크, 다크서 흐리지 않게 채도 올림)
-const CODEX = '#1a7fd4,#3fa9ff';  // 서비스 헤더색(블루, 동일)
+const DETAIL = '#4b5563,#aab4c4'; // 비용·이용권 날짜(회색 dimming 금지)
+const SUBTLE = '#5b6470,#aab4c4'; // 버전·마지막 확인 등 진짜 부차 메타
+const CLAUDE = '#b42363,#ff5f9c'; // 서비스 헤더색(핑크, 라이트·다크 분리)
+const CODEX = '#0067b1,#3fa9ff';  // 서비스 헤더색(블루, 라이트·다크 분리)
 const COST_TITLE = { monthly: '이번 달 누적 비용', weekly: '이번 주 누적 비용', today: '오늘 누적 비용' };
 // 버튼 공통 아이콘 — "누르는 것"의 표식(전 버튼 동일, 데이터 줄엔 안 붙임).
 const BUTTON_ICON = 'chevron.right.circle';
@@ -61,7 +62,10 @@ const UNAVAILABLE_HINT = {
 // SwiftBar가 2분마다 이 스크립트를 재실행하므로, 낡음 게이트(10분)로 호출 빈도를 하루 ~120회로 묶는다.
 // 끄려면 SwiftBar에서 이 플러그인을 Disable 하면 된다(시스템 설치 없음).
 const AUTO_REFRESH_MIN = 10;
-maybeAutoRefresh();
+// 색 있는 정보 행의 refresh=true는 enabled rendering용이다. 그 클릭(MenuAction)이
+// 오래된 snapshot의 데이터 자동수집까지 우연히 발동하지 않게 표시 갱신과 수집을 분리한다.
+// 2분 schedule·URL scheme·앱 시작 등 기존 실행은 그대로 freshness gate를 탄다.
+if (process.env.SWIFTBAR_PLUGIN_REFRESH_REASON !== 'MenuAction') maybeAutoRefresh();
 
 const snapshot = readSnapshot(snapshotPath);
 const claude = snapshot?.services?.claude;
@@ -212,7 +216,7 @@ function isStaleMeta(dataMeta) {
 
 function printService(name, headerColor, service, dataMeta, opts = {}) {
   // 타이틀은 볼드(md=true 마크다운) + 서비스색.
-  console.log(`**${name}** | md=true color=${headerColor}`);
+  console.log(`**${name}** | ${enabledInfoParams(headerColor, 'md=true')}`);
   const staleReason = dataMeta?.staleReason ?? null;
   if (!service || (service.metrics ?? []).length === 0) {
     const hint = UNAVAILABLE_HINT[staleReason];
@@ -226,14 +230,14 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
     for (const metric of service.metrics) {
       // "라벨 막대 N% 사용 · 리셋" — 라벨 먼저(확정 레이아웃 2026-07-10), 막대는 쓴 % 기준(R8).
       const gauge = usageBar(metric.usedPercent);
-      console.log(`  ${metric.label} ${gauge ? `${gauge} ` : ''}${metric.usedPercent}% 사용 · ${shortResetLabel(metric)} | color=${metricColor(metric)}`);
+      console.log(`  ${metric.label} ${gauge ? `${gauge} ` : ''}${metric.usedPercent}% 사용 · ${shortResetLabel(metric)} | ${enabledInfoParams(metricColor(metric))}`);
     }
   }
   // 옛 데이터 안내: 나이 + 원인 + 해법(갱신 버튼·폴백) — R29·R30.
   if (isStaleMeta(dataMeta)) printStaleBlock(dataMeta, staleReason, opts);
   // 비용: 이번 달/주/오늘 누적(달러 기본 + 원화 괄호). 총액 항목(라벨 없음)만.
   for (const fact of (service?.facts ?? []).filter((f) => COST_TITLE[f.group])) {
-    console.log(`  ${COST_TITLE[fact.group]}: ${costWithKrw(fact)} | color=${SUBTLE}`);
+    console.log(`  ↳ ${COST_TITLE[fact.group]}: ${costWithKrw(fact)} | ${enabledInfoParams(DETAIL)}`);
   }
 }
 
@@ -286,6 +290,12 @@ function metricColor(metric) {
   return INK;
 }
 
+// SwiftBar 2.0.1은 action 없는 메뉴 행을 disabled로 렌더해 지정색을 흐리게 한다.
+// 정보 행에만 refresh=true를 붙여 enabled 상태로 만들고, 버튼 아이콘은 붙이지 않는다.
+function enabledInfoParams(color, extra = '') {
+  return [extra, `color=${color}`, 'refresh=true'].filter(Boolean).join(' ');
+}
+
 // "$X (₩Y)" — 환율이 있으면 원화를 괄호로 덧붙인다.
 function costWithKrw(fact) {
   const rate = snapshot?.app?.exchange?.rate;
@@ -301,11 +311,11 @@ function printCredits(resetCredits) {
   const count = resetCredits.availableCount ?? '--';
   // 개수 + 이용권마다 만료일 한 줄씩(배분 계획용으로 날짜 전부 보이게, 임박순 정렬됨).
   // 만료일은 available 상태만(사용됨·만료된 이용권 날짜가 남은 것처럼 보이지 않게). 상태값이 낯설면 전부 표시(정보 누락 방지).
-  console.log(`  초기화 이용권: ${count}개 남음 | color=${CODEX}`);
+  console.log(`  초기화 이용권: ${count}개 남음 | ${enabledInfoParams(CODEX)}`);
   const all = resetCredits.credits ?? [];
   const available = all.filter((credit) => credit.status === 'available');
   for (const credit of (available.length > 0 ? available : all)) {
-    if (credit.expiresAtKst) console.log(`  ${credit.expiresAtKst}까지 | color=${SUBTLE}`);
+    if (credit.expiresAtKst) console.log(`  ↳ ${credit.expiresAtKst}까지 | ${enabledInfoParams(DETAIL)}`);
   }
 }
 

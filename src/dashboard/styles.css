@@ -19,7 +19,8 @@
   --credit-sub: #185fa5;  /* 이용권 만료일 */
 
   /* 막대 B — 신호등 등급색 */
-  --warn: #f0a12b;        /* 주의 80%+ : 주황 */
+  --warn: #f0a12b;        /* 주의 70%+ 막대: 선명한 주황 */
+  --warn-ink: #9c5a00;    /* 주의 70%+ 글자: 밝은 배경에서 읽히는 진한 주황 */
   --danger: #ef3127;      /* 위험 90%+ : coral red */
   --track: #eeeff1;       /* 안 쓴 배경(중립) */
 
@@ -126,7 +127,7 @@ h3 { margin: 0; font-size: 20px; }
 .metric-used { font-size: 15px; } /* 지표 이름과 같은 크기(위계는 색·굵기로) */
 
 .metric-used.normal { color: var(--ink); }
-.metric-used.warning { color: var(--warn); }
+.metric-used.warning { color: var(--warn-ink); }
 .metric-used.danger { color: var(--danger); }
 .metric-used.unavailable { color: var(--muted); font-weight: 700; }
 

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { makeUsageMetric, usageTier, clampPercent } from '../src/lib/progress.js';
 
-// 등급(tier) 경계: 정상 < 80 ≤ 주의 < 90 ≤ 위험
+// 제품 기본 경계: 정상 < 70 ≤ 주의 < 90 ≤ 위험.
+assert.equal(usageTier(69), 'normal');
+assert.equal(usageTier(70), 'warning');
+assert.equal(usageTier(89.9), 'warning');
+assert.equal(usageTier(90), 'danger');
+
+// 호출부가 별도 임계값을 넘기는 경우도 계약대로 동작한다.
 assert.equal(usageTier(30, 80, 90), 'normal');
 assert.equal(usageTier(80, 80, 90), 'warning');
 assert.equal(usageTier(83, 80, 90), 'warning');
