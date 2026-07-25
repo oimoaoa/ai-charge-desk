@@ -251,11 +251,11 @@ console.log('✅ 드롭다운 뼈대 회귀(헤더·버튼) 유지');
   assert.match(full, /70 경계 .*70% 사용.*color=#9c5a00,#f0a12b refresh=true/, '70 warning production tier');
   assert.match(full, /89\.9 경계 .*89\.9% 사용.*color=#9c5a00,#f0a12b refresh=true/, '89.9 warning production tier');
   assert.match(full, /90 경계 .*90% 사용.*color=#c5221f,#ff665e refresh=true/, '90 danger production tier');
-  assert.equal((full.match(/↳ 이번 (?:달|주)|↳ 오늘/g) ?? []).length, 6, '양 서비스 비용 3종 전부');
-  assert.equal((full.match(/color=#4b5563,#aab4c4 refresh=true/g) ?? []).length, 8, '비용 6+이용권 날짜 2 DETAIL enabled');
+  assert.equal((full.match(/┗ 이번 (?:달|주)|┗ 오늘/g) ?? []).length, 6, '양 서비스 비용 3종 전부');
+  assert.equal((full.match(/┗ .*color=#1c2330,#eef1f6 refresh=true/g) ?? []).length, 8, '비용 6+이용권 날짜 2 고대비 DETAIL enabled');
   assert.match(full, /초기화 이용권: 2개 남음 \| color=#0067b1,#3fa9ff refresh=true/, '이용권 개수 CODEX enabled');
-  assert.match(full, /↳ 2026-08-01\(토\) 05:12까지 \| color=#4b5563,#aab4c4 refresh=true/, '첫 만료일 DETAIL enabled');
-  assert.match(full, /↳ 2026-08-13\(목\) 02:40까지 \| color=#4b5563,#aab4c4 refresh=true/, '둘째 만료일 DETAIL enabled');
+  assert.match(full, /┗ 2026-08-01\(토\) 05:12까지 \| color=#1c2330,#eef1f6 refresh=true/, '첫 만료일 고대비 DETAIL enabled');
+  assert.match(full, /┗ 2026-08-13\(목\) 02:40까지 \| color=#1c2330,#eef1f6 refresh=true/, '둘째 만료일 고대비 DETAIL enabled');
   assert.match(full, /v0\.0\.0-test · AI Charge Desk \| size=11 color=#5b6470,#aab4c4\n/, 'SUBTLE 버전 actionless 유지');
   console.log('✅ 드롭다운 색·위계·enabled 범위');
 }

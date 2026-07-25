@@ -28,7 +28,7 @@ if (!fs.existsSync(buildScript)) {
 const WARN = '#9c5a00,#f0a12b';   // 70%+ 주의(라이트,다크)
 const DANGER = '#c5221f,#ff665e'; // 90%+ 위험(라이트,다크)
 const INK = '#1c2330,#eef1f6';    // 본문(사용률·라벨) — 진하게
-const DETAIL = '#4b5563,#aab4c4'; // 비용·이용권 날짜(회색 dimming 금지)
+const DETAIL = INK; // 비용·이용권 날짜도 본문과 같은 고대비, 위계는 ┗로 표현
 const SUBTLE = '#5b6470,#aab4c4'; // 버전·마지막 확인 등 진짜 부차 메타
 const CLAUDE = '#b42363,#ff5f9c'; // 서비스 헤더색(핑크, 라이트·다크 분리)
 const CODEX = '#0067b1,#3fa9ff';  // 서비스 헤더색(블루, 라이트·다크 분리)
@@ -237,7 +237,7 @@ function printService(name, headerColor, service, dataMeta, opts = {}) {
   if (isStaleMeta(dataMeta)) printStaleBlock(dataMeta, staleReason, opts);
   // 비용: 이번 달/주/오늘 누적(달러 기본 + 원화 괄호). 총액 항목(라벨 없음)만.
   for (const fact of (service?.facts ?? []).filter((f) => COST_TITLE[f.group])) {
-    console.log(`  ↳ ${COST_TITLE[fact.group]}: ${costWithKrw(fact)} | ${enabledInfoParams(DETAIL)}`);
+    console.log(`  ┗ ${COST_TITLE[fact.group]}: ${costWithKrw(fact)} | ${enabledInfoParams(DETAIL)}`);
   }
 }
 
@@ -315,7 +315,7 @@ function printCredits(resetCredits) {
   const all = resetCredits.credits ?? [];
   const available = all.filter((credit) => credit.status === 'available');
   for (const credit of (available.length > 0 ? available : all)) {
-    if (credit.expiresAtKst) console.log(`  ↳ ${credit.expiresAtKst}까지 | ${enabledInfoParams(DETAIL)}`);
+    if (credit.expiresAtKst) console.log(`  ┗ ${credit.expiresAtKst}까지 | ${enabledInfoParams(DETAIL)}`);
   }
 }
 
