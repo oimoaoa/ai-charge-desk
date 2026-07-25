@@ -17,8 +17,12 @@ const pluginPath = path.join(repoRoot, 'swiftbar', 'ai-charge-desk.2m.js');
 const fixtureRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ai-charge-statusbar-'));
 await fs.promises.mkdir(path.join(fixtureRoot, 'data'), { recursive: true });
 await fs.promises.mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
-// 스텁 buildScript — 존재 확인용일 뿐 실행되면 안 된다(generatedAt을 항상 신선하게 줘서 자동수집 게이트가 막음).
-await fs.promises.writeFile(path.join(fixtureRoot, 'scripts', 'build-snapshot.mjs'), 'process.exit(0);\n');
+// 스텁 collector가 실제로 실행됐는지 marker로 센다. 신선한 기본 fixture에서는 0회여야 한다.
+const collectorMarkerPath = path.join(fixtureRoot, 'data', 'collector-runs.log');
+await fs.promises.writeFile(
+  path.join(fixtureRoot, 'scripts', 'build-snapshot.mjs'),
+  `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(collectorMarkerPath)}, 'run\\n');\n`
+);
 await fs.promises.writeFile(path.join(fixtureRoot, 'package.json'), JSON.stringify({ version: '0.0.0-test' }));
 
 // production과 같은 makeUsageMetric 경로로 tier를 만든다.
@@ -58,6 +62,15 @@ function renderHead(snapshot, extraEnv = {}) {
     encoding: 'utf8'
   });
   return { head: out.split('\n')[0], full: out };
+}
+
+async function waitForFile(filePath, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(filePath)) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.fail(`collector marker가 ${timeoutMs}ms 안에 생성되지 않음`);
 }
 
 const staleMeta = { measuredAt: twoHoursAgo(), fresh: false, staleReason: 'token-expired' };
@@ -229,6 +242,7 @@ console.log('✅ 드롭다운 뼈대 회귀(헤더·버튼) 유지');
     claude: [
       metric('claude-session', '69 경계', 69),
       metric('claude-weekly', '70 경계', 70),
+      metric('claude-weekly-fable-normal', 'Fable 정상 핑크', 40),
       metric('claude-weekly-fable', '89.9 경계', 89.9),
       metric('claude-danger', '90 경계', 90)
     ],
@@ -249,6 +263,7 @@ console.log('✅ 드롭다운 뼈대 회귀(헤더·버튼) 유지');
   assert.match(full, /\*\*Codex\*\* \| md=true color=#0067b1,#3fa9ff refresh=true/, 'Codex 헤더 enabled light/dark');
   assert.match(full, /69 경계 .*69% 사용.*color=#1c2330,#eef1f6 refresh=true/, '69 normal production tier');
   assert.match(full, /70 경계 .*70% 사용.*color=#9c5a00,#f0a12b refresh=true/, '70 warning production tier');
+  assert.match(full, /Fable 정상 핑크 .*40% 사용.*color=#b42363,#ff5f9c refresh=true/, 'Fable normal CLAUDE pink enabled');
   assert.match(full, /89\.9 경계 .*89\.9% 사용.*color=#9c5a00,#f0a12b refresh=true/, '89.9 warning production tier');
   assert.match(full, /90 경계 .*90% 사용.*color=#c5221f,#ff665e refresh=true/, '90 danger production tier');
   assert.equal((full.match(/┗ 이번 (?:달|주)|┗ 오늘/g) ?? []).length, 6, '양 서비스 비용 3종 전부');
@@ -260,10 +275,11 @@ console.log('✅ 드롭다운 뼈대 회귀(헤더·버튼) 유지');
   console.log('✅ 드롭다운 색·위계·enabled 범위');
 }
 
-// MenuAction은 stale snapshot에서도 표시만 갱신하고 자동수집 lock을 만들지 않는다.
+// MenuAction은 collector 0회, Schedule은 collector 1회여야 한다.
 {
   const lockPath = path.join(fixtureRoot, 'data', '.refresh.lock');
   fs.rmSync(lockPath, { force: true });
+  fs.rmSync(collectorMarkerPath, { force: true });
   const staleSnapshot = snapshotWith({
     claude: [metric('claude-session', '5시간', 70)],
     codex: CODEX_OK,
@@ -271,11 +287,16 @@ console.log('✅ 드롭다운 뼈대 회귀(헤더·버튼) 유지');
   });
   renderHead(staleSnapshot, { SWIFTBAR_PLUGIN_REFRESH_REASON: 'MenuAction' });
   assert.equal(fs.existsSync(lockPath), false, 'MenuAction은 자동수집 lock을 만들지 않음');
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.equal(fs.existsSync(collectorMarkerPath), false, 'MenuAction collector 실행 0회');
 
   renderHead(staleSnapshot, { SWIFTBAR_PLUGIN_REFRESH_REASON: 'Schedule' });
   assert.equal(fs.existsSync(lockPath), true, 'Schedule은 기존 자동수집 freshness gate 유지');
+  await waitForFile(collectorMarkerPath);
+  assert.equal(fs.readFileSync(collectorMarkerPath, 'utf8').trim().split('\n').length, 1, 'Schedule collector 실행 1회');
   fs.rmSync(lockPath, { force: true });
-  console.log('✅ MenuAction display-only / Schedule 자동수집 유지');
+  fs.rmSync(collectorMarkerPath, { force: true });
+  console.log('✅ MenuAction collector 0회 / Schedule collector 1회');
 }
 
 // 스냅샷 파손(JSON 깨짐) — 크래시 없이 양쪽 `--`로 정직 표시(가짜값 금지).

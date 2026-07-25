@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { makeUsageMetric, usageTier, clampPercent } from '../src/lib/progress.js';
 
 // 제품 기본 경계: 정상 < 70 ≤ 주의 < 90 ≤ 위험.
@@ -40,5 +43,22 @@ const unavailable = makeUsageMetric({ id: 'x', label: 'x', usedPercent: null, so
 assert.equal(unavailable.tier, 'unavailable');
 assert.equal(unavailable.fillPercent, 0);
 assert.equal(unavailable.usedPercent, null);
+
+// 대시보드 90% 글자는 서비스 tint 위에서도 WCAG 일반 텍스트 AA(4.5:1)를 넘는다.
+const cssPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'dashboard', 'styles.css');
+const css = fs.readFileSync(cssPath, 'utf8');
+const cssColor = (name) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1];
+const rgb = (hex) => hex.slice(1).match(/../g).map((value) => Number.parseInt(value, 16) / 255);
+const luminance = (hex) => {
+  const [r, g, b] = rgb(hex).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (foreground, background) => {
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+assert.match(css, /\.metric-used\.danger \{ color: var\(--danger-ink\); \}/);
+assert.ok(contrast(cssColor('danger-ink'), cssColor('claude-tint')) >= 4.5, 'Claude tint의 danger 글자 AA 대비');
+assert.ok(contrast(cssColor('danger-ink'), cssColor('codex-tint')) >= 4.5, 'Codex tint의 danger 글자 AA 대비');
 
 console.log('progress.test.mjs passed');

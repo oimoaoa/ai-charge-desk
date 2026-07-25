@@ -22,6 +22,7 @@
   --warn: #f0a12b;        /* 주의 70%+ 막대: 선명한 주황 */
   --warn-ink: #9c5a00;    /* 주의 70%+ 글자: 밝은 배경에서 읽히는 진한 주황 */
   --danger: #ef3127;      /* 위험 90%+ : coral red */
+  --danger-ink: #c5221f;  /* 위험 90%+ 글자: 서비스 tint에서 AA 대비를 넘는 진한 빨강 */
   --track: #eeeff1;       /* 안 쓴 배경(중립) */
 
   color-scheme: light;
@@ -128,7 +129,7 @@ h3 { margin: 0; font-size: 20px; }
 
 .metric-used.normal { color: var(--ink); }
 .metric-used.warning { color: var(--warn-ink); }
-.metric-used.danger { color: var(--danger); }
+.metric-used.danger { color: var(--danger-ink); }
 .metric-used.unavailable { color: var(--muted); font-weight: 700; }
 
 /* 막대 B: 트랙(안 쓴 배경) 위에 쓴 만큼 채우고, 채운 막대 전체가 등급색 */
